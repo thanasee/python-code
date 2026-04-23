@@ -567,10 +567,10 @@ def rotate_atoms(lattice_matrix, total_atoms, positions_cartesian, species, rota
     input_type, selected_atoms, ref_point = select_pivot(lattice_matrix, total_atoms, positions_cartesian, species)
 
     if input_type == '1':
-        new_positions_cartesian = rotate_matrix @ (positions_cartesian - ref_point) + ref_point
+        new_positions_cartesian = (positions_cartesian - ref_point) @ rotate_matrix.T + ref_point
     else:
         new_positions_cartesian = np.copy(positions_cartesian)
-        new_positions_cartesian[selected_atoms] = rotate_matrix @ (positions_cartesian[selected_atoms] - ref_point) + ref_point
+        new_positions_cartesian[selected_atoms] = (positions_cartesian[selected_atoms] - ref_point) @ rotate_matrix.T + ref_point
 
     return new_positions_cartesian
 
