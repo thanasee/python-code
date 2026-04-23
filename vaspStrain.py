@@ -160,7 +160,7 @@ def direct_to_cartesian(lattice_matrix, positions_direct):
     """
 
     positions = positions_direct % 1.0
-    positions_cartesian = np.dot(positions, lattice_matrix)
+    positions_cartesian = positions @ lattice_matrix
 
     return positions_cartesian
 
@@ -180,7 +180,7 @@ def cartesian_to_direct(lattice_matrix, positions_cartesian):
     positions_direct : np.ndarray, shape (N, 3) — fractional coordinates in [0, 1)
     """
 
-    positions_direct = np.dot(positions_cartesian, np.linalg.inv(lattice_matrix)) % 1.0
+    positions_direct = (positions_cartesian @ np.linalg.inv(lattice_matrix)) % 1.0
 
     return positions_direct
 
@@ -422,7 +422,7 @@ Enter strain matrix (separate by space):"""
         strain_matrix = (strain_matrix + strain_matrix.T) / 2
         break
 
-    new = np.dot(lattice_matrix, np.eye(len(strain_matrix)) + strain_matrix)
+    new = lattice_matrix @ (np.eye(len(strain_matrix)) + strain_matrix)
     
     return {"strain_matrix": strain_matrix,
             "lattice_matrix": new}
