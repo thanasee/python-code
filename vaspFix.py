@@ -156,7 +156,7 @@ def direct_to_cartesian(lattice_matrix, positions_direct):
     """
 
     positions = positions_direct % 1.0
-    positions_cartesian = np.dot(positions, lattice_matrix)
+    positions_cartesian = positions @ lattice_matrix
 
     return positions_cartesian
 
@@ -176,7 +176,7 @@ def cartesian_to_direct(lattice_matrix, positions_cartesian):
     positions_direct : np.ndarray, shape (N, 3) — fractional coordinates in [0, 1)
     """
 
-    positions_direct = np.dot(positions_cartesian, np.linalg.inv(lattice_matrix)) % 1.0
+    positions_direct = (positions_cartesian @ np.linalg.inv(lattice_matrix)) % 1.0
 
     return positions_direct
 
@@ -369,6 +369,100 @@ def write_POSCAR(filepath, lattice_matrix, elements, atom_counts,
                         f"   {label:>6s}\n")
 
 
+def compute_image_offsets(lattice_matrix):
+    """Pre-compute all 27 periodic image translation vectors.
+
+    Generates vectors k*a + l*b + m*c for k, l, m in {-1, 0, 1},
+    covering the origin cell and all 26 neighbouring cells.
+    Used to find the minimum-image distance under periodic boundary conditions.
+
+    Parameters
+    ----------
+    lattice_matrix : (3, 3) ndarray, Cartesian lattice vectors (Angstrom)
+
+    Returns
+    -------
+    image_offsets : (27, 3) ndarray, translation vectors in Cartesian coordinates
+    """
+
+    klm = np.array([[k, l, m] for k in range(-1, 2)
+                               for l in range(-1, 2)
+                               for m in range(-1, 2)])
+    
+    return klm @ lattice_matrix
+
+
+def min_image_distance(position_i, position_j, image_offsets):
+    """Compute the minimum-image distance between two atomic positions.
+
+    Adds all 27 image offsets to the displacement vector and returns
+    the shortest distance, accounting for periodic boundary conditions.
+
+    Parameters
+    ----------
+    position_i    : (3,) ndarray, Cartesian position of atom i (Angstrom)
+    position_j    : (3,) ndarray, Cartesian position of atom j (Angstrom)
+    image_offsets : (27, 3) ndarray, periodic image translation vectors
+
+    Returns
+    -------
+    float : minimum-image distance in Angstrom
+    """
+
+    diff = position_j - position_i                   # (3,)
+    diff_offset = diff[np.newaxis, :] + image_offsets # (27, 3)
+    
+    return np.linalg.norm(diff_offset, axis=1).min()
+
+
+def parse_group(prompt, total_atoms, species, allow_all=True):
+    """Interactively parse a free-format atom selection from the user.
+
+    Accepts a mix of:
+    - Individual atom indexes     : e.g. '1 3 5'
+    - Ranges of atom indexes      : e.g. '1-4'  (inclusive, 1-based)
+    - Element symbols             : e.g. 'Fe C'  (selects all atoms of that species)
+    - Keyword 'all'               : selects all atoms (only if allow_all=True)
+
+    Keeps prompting until a valid, non-empty selection within [1, total_atoms] is given.
+
+    Parameters
+    ----------
+    prompt      : str, message printed before the input prompt
+    total_atoms : int, total number of atoms in the system
+    species     : list of str, element symbol for each atom (length N)
+    allow_all   : bool, whether the keyword 'all' is permitted (default True)
+
+    Returns
+    -------
+    group : list of int, 0-based atom indexes of the selected atoms
+    """
+
+    print(prompt)
+    while True:
+        group = []
+        raw = input().split()
+        valid = True
+        for token in raw:
+            if token == 'all':
+                if not allow_all:
+                    print("  Cannot use 'all' in this method. TRY AGAIN!")
+                    valid = False; break
+                group.extend(range(total_atoms))
+            elif '-' in token:
+                start, end = map(int, token.split('-'))
+                group.extend(range(start - 1, end))
+            elif token.isdigit():
+                group.append(int(token) - 1)
+            else:
+                group.extend([j for j, lbl in enumerate(species) if lbl == token])
+        if not valid:
+            continue
+        if group and all(0 <= idx < total_atoms for idx in group):
+            return group
+        print("  Wrong input atom-indexes! TRY AGAIN!")
+
+
 def refix(total_atoms, selective_dynamics, flags):
     """Initialise Selective Dynamics flags and ask how to proceed when they already exist.
  
@@ -461,7 +555,7 @@ Input element-symbol and/or atom-indexes to choose ({1:>3} to {total_atoms:>3})
     return selected_atoms
 
 
-def select_radius(lattice_matrix, total_atoms, positions_cartesian):
+def select_radius(lattice_matrix, total_atoms, positions_cartesian, species):
     """Select atoms that lie outside a cutoff radius from a reference point.
  
     The reference point is the centroid of a user-specified set of atoms.
@@ -478,31 +572,11 @@ def select_radius(lattice_matrix, total_atoms, positions_cartesian):
     -------
     selected_atoms : list[int] — 0-based indexes of atoms outside the cutoff radius
     """
-    print("""
-Choose reference point
-Input atom-indexes of molecule (Free-format input, e.g., 1 3 1-4): """)
-    while True:
-        indices = []
-        input_atoms = input().split()
+    
+    targets = parse_group(f"\nChoose reference point\nInput element-symbol and/or atom-indexes to choose ({1:>3} to {total_atoms:>3})\n"
+"(Free-format input, e.g., 1 3 1-4 C H all)", total_atoms, species, allow_all=True)
  
-        for atom in input_atoms:
-            if '-' in atom:
-                try:
-                    start, end = map(int, atom.split('-'))
-                    indices.extend(range(start - 1, end))
-                except ValueError:
-                    print("Invalid range format! Try again.")
-            elif atom.isnumeric():
-                indices.append(int(atom) - 1)
-            else:
-                print("Invalid atom-index format! Try again.")
- 
-        if len(indices) > total_atoms or not all(0 <= idx < total_atoms for idx in indices):
-            print(f"Invalid input! Ensure indices are between 1 and {total_atoms}. Try again.")
-        else:
-            break
- 
-    reference_point = np.mean(positions_cartesian[indices], axis=0)
+    reference_point = np.mean(positions_cartesian[targets], axis=0)
  
     while True:
         try:
@@ -513,16 +587,9 @@ Input atom-indexes of molecule (Free-format input, e.g., 1 3 1-4): """)
             print("ERROR! Input cutoff radius must be a positive number.")
  
     selected_atoms = []
+    image_offsets = compute_image_offsets(lattice_matrix)
     for index, position in enumerate(positions_cartesian):
-        min_distance = np.linalg.norm(position - reference_point)
- 
-        # Consider periodic boundary conditions
-        for j in [-1, 0, 1]:
-            for k in [-1, 0, 1]:
-                for l in [-1, 0, 1]:
-                    offset = j * lattice_matrix[0] + k * lattice_matrix[1] + l * lattice_matrix[2]
-                    candidate_distance = np.linalg.norm(position + offset - reference_point)
-                    min_distance = min(min_distance, candidate_distance)
+        min_distance = min_image_distance(positions_cartesian[index], reference_point, image_offsets)
  
         if min_distance > input_radius:
             selected_atoms.append(index)
@@ -640,7 +707,7 @@ Choices of fixing atoms method
             selected_atoms = select_index(total_atoms, species)
             break
         elif fix_mode == '2':
-            selected_atoms = select_radius(lattice_matrix, total_atoms, positions_cartesian)
+            selected_atoms = select_radius(lattice_matrix, total_atoms, positions_cartesian, species)
             break
         elif fix_mode == '3':
             flags = select_file(total_atoms)
