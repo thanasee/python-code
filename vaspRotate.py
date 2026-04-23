@@ -155,7 +155,7 @@ def direct_to_cartesian(lattice_matrix, positions_direct):
     """
 
     positions = positions_direct % 1.0
-    positions_cartesian = np.dot(positions, lattice_matrix)
+    positions_cartesian = positions @ lattice_matrix
 
     return positions_cartesian
 
@@ -175,7 +175,7 @@ def cartesian_to_direct(lattice_matrix, positions_cartesian):
     positions_direct : np.ndarray, shape (N, 3) — fractional coordinates in [0, 1)
     """
 
-    positions_direct = np.dot(positions_cartesian, np.linalg.inv(lattice_matrix)) % 1.0
+    positions_direct = (positions_cartesian @ np.linalg.inv(lattice_matrix)) % 1.0
 
     return positions_direct
 
@@ -567,10 +567,10 @@ def rotate_atoms(lattice_matrix, total_atoms, positions_cartesian, species, rota
     input_type, selected_atoms, ref_point = select_pivot(lattice_matrix, total_atoms, positions_cartesian, species)
 
     if input_type == '1':
-        new_positions_cartesian = np.dot(positions_cartesian - ref_point, rotate_matrix.T) + ref_point
+        new_positions_cartesian = (positions_cartesian - ref_point) @ rotate_matrix.T + ref_point
     else:
         new_positions_cartesian = np.copy(positions_cartesian)
-        new_positions_cartesian[selected_atoms] = (np.dot(positions_cartesian[selected_atoms] - ref_point, rotate_matrix.T) + ref_point)
+        new_positions_cartesian[selected_atoms] = (positions_cartesian[selected_atoms] - ref_point) @ rotate_matrix.T + ref_point
 
     return new_positions_cartesian
 
