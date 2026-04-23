@@ -287,8 +287,9 @@ def compute_piezo_2d(structure, piezostress_coef, elastic_coef, moduli_index):
     vector_b = structure.cell[1]
     vector_c = structure.cell[2]
 
-    vector_n  = np.cross(vector_a, vector_b) / np.linalg.norm(np.cross(vector_a, vector_b))
-    factor_2d = np.abs(np.dot(vector_c, vector_n)) # Angstrom
+    area_vector = np.cross(vector_a, vector_b)
+    vector_n  = area_vector / np.linalg.norm(area_vector)
+    factor_2d = np.abs(vector_c @ vector_n) # Angstrom
 
     piezostress_2d = piezostress_coef[:, [0, 1, 5]] * factor_2d  # Convert C/m^2*Angstrom to 10^-10 C/m
 
@@ -482,7 +483,7 @@ def run_2d(structure, piezostress_coef, elastic_coef, moduli_index):
     check_stability_2d(elastic_2d, factor_2d)
 
     compliance_2d  = np.linalg.inv(elastic_2d)
-    piezostrain_2d = np.dot(piezostress_2d, compliance_2d) * 1e2  # 10^-10 m/V to pm/V
+    piezostrain_2d = (piezostress_2d @ compliance_2d) * 1e2  # 10^-10 m/V to pm/V
 
     write_piezostrain_2d(piezostrain_2d)
 
@@ -687,7 +688,7 @@ def run_3d(piezostress_coef, elastic_coef):
     check_stability_3d(elastic_3d)
 
     compliance_3d  = np.linalg.inv(elastic_3d)
-    piezostrain_3d = np.dot(piezostress_3d, compliance_3d) * 1e3  # C/m^2 / GPa to pm/V
+    piezostrain_3d = (piezostress_3d @ compliance_3d) * 1e3  # C/m^2 / GPa to pm/V
 
     write_piezostrain_3d(piezostrain_3d)
 
