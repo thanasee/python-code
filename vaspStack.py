@@ -157,7 +157,7 @@ def direct_to_cartesian(lattice_matrix, positions_direct):
     """
 
     positions = positions_direct % 1.0
-    positions_cartesian = np.dot(positions, lattice_matrix)
+    positions_cartesian = positions @ lattice_matrix
 
     return positions_cartesian
 
@@ -177,7 +177,7 @@ def cartesian_to_direct(lattice_matrix, positions_cartesian):
     positions_direct : np.ndarray, shape (N, 3) — fractional coordinates in [0, 1)
     """
 
-    positions_direct = np.dot(positions_cartesian, np.linalg.inv(lattice_matrix)) % 1.0
+    positions_direct = (positions_cartesian @ np.linalg.inv(lattice_matrix)) % 1.0
 
     return positions_direct
 
@@ -557,9 +557,8 @@ def get_2d_lattice_type(lattice_matrix):
 
     length_a = np.linalg.norm(lattice_matrix[0])
     length_b = np.linalg.norm(lattice_matrix[1])
-    gamma = np.degrees(np.arccos(np.clip(
-        np.dot(lattice_matrix[0], lattice_matrix[1]) /
-        (length_a * length_b), -1., 1.)))
+    gamma = np.degrees(np.arccos(np.clip((lattice_matrix[0] @ lattice_matrix[1]) /
+                                         (length_a * length_b), -1., 1.)))
 
     if np.abs(gamma - 90.) < 1e-5:
         return 'square' if np.abs(length_a - length_b) < 1e-8 else 'rectangular'
