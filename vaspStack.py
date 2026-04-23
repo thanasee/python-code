@@ -426,7 +426,7 @@ def flip_sheet(positions_cartesian, flip_mode):
     new_positions_cartesian = positions_cartesian.copy()
 
     if flip_mode == 'none':
-        return new_positions_cartesian
+        pass
 
     centroid = np.mean(positions_cartesian, axis=0)
 
@@ -444,6 +444,8 @@ def flip_sheet(positions_cartesian, flip_mode):
     elif flip_mode == 'xy':
         new_positions_cartesian[:, 0] = 2.0 * centroid[0] - positions_cartesian[:, 0]
         new_positions_cartesian[:, 1] = 2.0 * centroid[1] - positions_cartesian[:, 1]
+    
+    return new_positions_cartesian
 
 
 def rotate_sheet(positions_cartesian, degree):
@@ -477,8 +479,7 @@ def rotate_sheet(positions_cartesian, degree):
     centroid = np.mean(positions_cartesian, axis=0)
     centroid[2] = 0.0
 
-    centered = positions_cartesian - centroid
-    rotated  = np.dot(centered, rotate_matrix.T) + centroid
+    rotated  = (positions_cartesian - centroid) @ rotate_matrix.T + centroid
 
     return rotated
 
@@ -805,6 +806,9 @@ def main():
     shifts    = get_shift_grid(lattice_type)
     rotations = get_rotation_grid(lattice_type)
     flips     = get_flip_grid(lattice_type)
+    total = len(flips) * len(rotations) * len(shifts)
+    
+    place = len(str(total))
     
     i = 1
     for flip_mode, flip_label in flips:
@@ -812,7 +816,7 @@ def main():
 
         for degree, rot_label in rotations:
             if np.abs(degree) > 1e-8:
-                rotated_positions_cartesian = rotate_sheet(flipped_positions_cartesian, monolayer["lattice_matrix"], degree)
+                rotated_positions_cartesian = rotate_sheet(flipped_positions_cartesian, degree)
             else:
                 rotated_positions_cartesian = flipped_positions_cartesian.copy()
             rotated_positions_direct = cartesian_to_direct(monolayer["lattice_matrix"], rotated_positions_cartesian)
@@ -825,14 +829,15 @@ def main():
                 mapping = mapping_elements(bilayer_elements, bilayer["atom_counts"], bilayer_positions_cartesian, bilayer["positions_direct"],
                                            bilayer["species"], monolayer["selective_dynamics"], bilayer["flags"], sort_elements)
                 labels = define_labels(mapping["elements"], mapping["atom_counts"])
-                output_dir = os.path.join(working_dir, f"{i}_{flip_label}_{rot_label}_{stack_label}")
+                output_name = f"{str(i).zfill(place)}_{flip_label}_{rot_label}_{stack_label}"
+                output_dir = os.path.join(working_dir, output_name)
                 os.makedirs(output_dir, exist_ok=True)
                 output_path = os.path.join(output_dir, "POSCAR")
                 write_POSCAR(output_path, monolayer["lattice_matrix"], mapping["elements"], mapping["atom_counts"],
                              mapping["positions_direct"], monolayer["selective_dynamics"], mapping["flags"], labels)
                 i += 1
 
-    total = len(flips) * len(rotations) * len(shifts)
+    
     print(f"Written {total} POSCARs Finished!\n")
     
     stack_list = "STACK_LIST.dat"
