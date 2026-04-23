@@ -151,8 +151,9 @@ def compute_elastic_2d(structure, elastic_coef):
     vector_b = structure.cell[1]
     vector_c = structure.cell[2]
     
-    vector_n  = np.cross(vector_a, vector_b) / np.linalg.norm(np.cross(vector_a, vector_b))
-    factor_2d = np.abs(np.dot(vector_c, vector_n)) / 10  # Angstrom to nm
+    area_vector = np.cross(vector_a, vector_b)
+    vector_n    = area_vector / np.linalg.norm(area_vector)
+    factor_2d   = np.abs(vector_c @ vector_n) / 10  # Angstrom to nm
     
     elastic_2d = elastic_coef[np.ix_([0, 1, 5], [0, 1, 5])] * factor_2d  # Convert unit GPa*Angstrom to N/m
     
@@ -247,7 +248,7 @@ def compute_directional_properties_2d(elastic_2d):
         Shear modulus at each angle (N/m).
     """
     degrees = np.arange(0, 360.0, 0.1)
-    radians = np.deg2rad(degrees)
+    radians = np.radians(degrees)
     sin = np.sin(radians)
     cos = np.cos(radians)
     
