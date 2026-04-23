@@ -161,7 +161,7 @@ def direct_to_cartesian(lattice_matrix, positions_direct):
     """
 
     positions = positions_direct % 1.0
-    positions_cartesian = np.dot(positions, lattice_matrix)
+    positions_cartesian = positions @ lattice_matrix
 
     return positions_cartesian
 
@@ -181,7 +181,7 @@ def cartesian_to_direct(lattice_matrix, positions_cartesian):
     positions_direct : np.ndarray, shape (N, 3) — fractional coordinates in [0, 1)
     """
 
-    positions_direct = np.dot(positions_cartesian, np.linalg.inv(lattice_matrix)) % 1.0
+    positions_direct = (positions_cartesian @ np.linalg.inv(lattice_matrix)) % 1.0
 
     return positions_direct
 
@@ -454,24 +454,25 @@ def build_supercell(expansion_matrix, replicas, lattice_matrix, atom_counts, tot
     """
     
     # Expansion of lattice matrix
-    new_lattice_matrix = np.dot(expansion_matrix, lattice_matrix)
+    new_lattice_matrix = expansion_matrix @ lattice_matrix
     
     # Generate lattice grid points inside the supercell
     # Use the 8 corners of the unit supercell box to bound the search range
-    corners = np.array([[i, j, k]
-                        for i in range(2) for j in range(2) for k in range(2)])
-    corner_transformed = np.dot(corners, expansion_matrix)
+    corners = np.array([[i, j, k] for i in range(2)
+                        for j in range(2) 
+                        for k in range(2)])
+    corner_transformed = corners @ expansion_matrix
     min_points = np.min(corner_transformed, axis=0).astype(int)
     max_points = np.max(corner_transformed, axis=0).astype(int) + 1
 
     # Generate all combinations of i, j, k within the given expansion matrix
     all_points = np.array([[i, j, k] for i in range(min_points[0], max_points[0])
-                                for j in range(min_points[1], max_points[1])
-                                for k in range(min_points[2], max_points[2])])
+                           for j in range(min_points[1], max_points[1])
+                           for k in range(min_points[2], max_points[2])])
 
     # Keep only points whose fractional coordinates in the supercell are in [0, 1)
     adj = np.round(np.linalg.inv(expansion_matrix) * replicas).astype(int)
-    frac_points = np.dot(all_points, adj)
+    frac_points = all_points @ adj
     mask = (np.all(frac_points >= 0, axis=1) &
             np.all(frac_points <  replicas, axis=1))
     grid_points = all_points[mask]
@@ -483,7 +484,7 @@ def build_supercell(expansion_matrix, replicas, lattice_matrix, atom_counts, tot
     # Generate new atomic positions
     # positions are in Å; grid_points are in primitive-cell lattice coordinates
     # Cartesian displacement for each grid point: dot(grid_point, lattice_matrix)
-    grid_cartesian = np.dot(grid_points, lattice_matrix)  # shape: (n_replicas, 3)
+    grid_cartesian = grid_points @ lattice_matrix  # shape: (n_replicas, 3)
      
     # Broadcast: (n_atoms, 1, 3) + (1, n_replicas, 3) → (n_atoms, n_replicas, 3)
     new_positions_cartesian = (positions_cartesian[:, np.newaxis, :] + grid_cartesian[np.newaxis, :, :]).reshape(-1, 3)
