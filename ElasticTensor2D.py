@@ -167,7 +167,7 @@ def direct_to_cartesian(lattice_matrix, positions_direct):
     """
 
     positions = positions_direct % 1.0
-    positions_cartesian = np.dot(positions, lattice_matrix)
+    positions_cartesian = positions @ lattice_matrix
 
     return positions_cartesian
 
@@ -187,7 +187,7 @@ def cartesian_to_direct(lattice_matrix, positions_cartesian):
     positions_direct : np.ndarray, shape (N, 3) — fractional coordinates in [0, 1)
     """
 
-    positions_direct = np.dot(positions_cartesian, np.linalg.inv(lattice_matrix)) % 1.0
+    positions_direct = (positions_cartesian @ np.linalg.inv(lattice_matrix)) % 1.0
 
     return positions_direct
 
@@ -402,9 +402,8 @@ def get_2d_lattice_type(lattice_matrix):
 
     length_a = np.linalg.norm(lattice_matrix[0])
     length_b = np.linalg.norm(lattice_matrix[1])
-    gamma = np.degrees(np.arccos(np.clip(
-        np.dot(lattice_matrix[0], lattice_matrix[1]) /
-        (length_a * length_b), -1., 1.)))
+    gamma = np.degrees(np.arccos(np.clip((lattice_matrix[0] @ lattice_matrix[1]) /
+                                         (length_a * length_b), -1., 1.)))
 
     if np.abs(gamma - 90.) < 1e-5:
         return 'square' if np.abs(length_a - length_b) < 1e-8 else 'rectangular'
@@ -494,7 +493,7 @@ def applying_strain(lattice_matrix, strain_matrix):
     np.ndarray (3, 3) — strained lattice vectors in Å
     """
 
-    return np.dot(lattice_matrix, np.eye(3) + strain_matrix)
+    return lattice_matrix @ (np.eye(3) + strain_matrix)
 
 
 def read_OUTCAR(filepath):
@@ -630,8 +629,7 @@ def collect_fitting_coef(strain_types, strain_range, area):
             continue
 
         strain_energy = np.array(strain_energy, dtype=float)
-        constants[strain_type] = fitting_strain_energy(strain_type, strain_range,
-                                                       strain_energy, area)
+        constants[strain_type] = fitting_strain_energy(strain_type, strain_range, strain_energy, area)
 
     return constants
 
@@ -705,7 +703,7 @@ def check_stability(elastic_tensor, lattice_matrix, area_vector, area):
     """
 
     vector_n  = area_vector / area
-    factor_2d = np.abs(np.dot(lattice_matrix[2], vector_n)) / 10
+    factor_2d = np.abs(lattice_matrix[2] @ vector_n) / 10
 
     return np.all(np.linalg.eigvalsh(elastic_tensor) > 1e-5 * factor_2d)
 
@@ -880,8 +878,7 @@ def mode_pre(filepath):
             strain_path = os.path.join(strain_type, f"strain{strain:+.2f}")
             os.makedirs(strain_path, exist_ok=True)
             strain_matrix = build_strain_matrix(strain_type, strain)
-            new_lattice_matrix = applying_strain(poscar["lattice_matrix"],
-                                                 strain_matrix)
+            new_lattice_matrix = applying_strain(poscar["lattice_matrix"], strain_matrix)
             write_POSCAR(os.path.join(strain_path, 'POSCAR'), new_lattice_matrix, mapping["elements"],
                          mapping["atom_counts"], poscar["positions_direct"], mapping["selective_dynamics"],
                          mapping["flags"], labels)
