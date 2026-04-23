@@ -161,7 +161,7 @@ def direct_to_cartesian(lattice_matrix, positions_direct):
     """
 
     positions = positions_direct % 1.0
-    positions_cartesian = np.dot(positions, lattice_matrix)
+    positions_cartesian = positions @ lattice_matrix
 
     return positions_cartesian
 
@@ -181,7 +181,7 @@ def cartesian_to_direct(lattice_matrix, positions_cartesian):
     positions_direct : np.ndarray, shape (N, 3) — fractional coordinates in [0, 1)
     """
 
-    positions_direct = np.dot(positions_cartesian, np.linalg.inv(lattice_matrix)) % 1.0
+    positions_direct = (positions_cartesian @ np.linalg.inv(lattice_matrix)) % 1.0
 
     return positions_direct
 
@@ -434,7 +434,7 @@ def input_direct(lattice_matrix):
             print("Wrong input! Try again")
     coords.append(0.0)
 
-    return np.dot(coords, lattice_matrix)
+    return coords @ lattice_matrix
 
 
 def place_ontop(lattice_matrix_substrate, total_atoms_substrate, total_atoms_adsorbent, positions_substrate,
@@ -658,8 +658,7 @@ Choices of define initial adsorption site
         displacement = np.dot(rotate_matrix, distance)
         new_site = target_center + displacement
 
-        rotate_position_adsorbent = (np.dot(positions_adsorbent - reference_adsorbent,
-                                            rotate_matrix.T) + reference_adsorbent)
+        rotate_position_adsorbent = (positions_adsorbent - reference_adsorbent) @ rotate_matrix.T + reference_adsorbent
         translate = new_site - reference_adsorbent
 
         new_positions_adsorbent.append(rotate_position_adsorbent + translate)
