@@ -658,7 +658,7 @@ Choices of define initial adsorption site
         displacement = rotate_matrix @ distance
         new_site = target_center + displacement
 
-        rotate_position_adsorbent = rotate_matrix @ (positions_adsorbent - reference_adsorbent) + reference_adsorbent
+        rotate_position_adsorbent = (positions_adsorbent - reference_adsorbent) @ rotate_matrix.T + reference_adsorbent
         translate = new_site - reference_adsorbent
 
         new_positions_adsorbent.append(rotate_position_adsorbent + translate)
