@@ -655,10 +655,10 @@ Choices of define initial adsorption site
     for i in range(number_adsorbent):
         rotate_matrix = rotation_matrix(i, angle_step)
 
-        displacement = np.dot(rotate_matrix, distance)
+        displacement = rotate_matrix @ distance
         new_site = target_center + displacement
 
-        rotate_position_adsorbent = (positions_adsorbent - reference_adsorbent) @ rotate_matrix.T + reference_adsorbent
+        rotate_position_adsorbent = rotate_matrix @ (positions_adsorbent - reference_adsorbent) + reference_adsorbent
         translate = new_site - reference_adsorbent
 
         new_positions_adsorbent.append(rotate_position_adsorbent + translate)
