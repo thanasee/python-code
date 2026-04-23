@@ -11,13 +11,16 @@ def usage():
     """Print usage information and exit."""
     text = """
 Usage:
-  vaspTwist.py <bottom>         Homobilayer  — twist one monolayer against itself
-  vaspTwist.py <bottom> <top>   Heterobilayer — twist two different monolayers
+  vaspTwist.py match    POSCAR_1             Homobilayer  — search commensurate cells
+  vaspTwist.py match    POSCAR_1  POSCAR_2   Heterobilayer — search commensurate cells
+  vaspTwist.py generate POSCAR_1             Generate POSCARs from existing TWIST_LIST.dat
+  vaspTwist.py generate POSCAR_1  POSCAR_2   Generate POSCARs from existing TWIST_LIST.dat
 
-This script supports VASP5 structure file format (i.e. POSCAR)
-for generating moiré twisted bilayer structures from monolayer input files.
-It searches for commensurate supercell vectors at candidate twist angles
-and writes one POSCAR per stacking configuration.
+Workflow:
+  1. Run 'match'    — searches twist angles 0–180° with step 0.1°, writes TWIST_LIST.dat
+                      sorted by strain.  No POSCAR is written at this stage.
+  2. Run 'generate' — reads TWIST_LIST.dat, shows the candidate table, prompts for
+                      index selection, then writes one POSCAR per stacking configuration.
 
 Only monolayer POSCAR files with vacuum space in the z-direction are supported.
 
@@ -27,10 +30,11 @@ This script was developed by Thanasee Thanasarnsurapong.
     exit(0)
 
 MAX_ATOMS  = 200    # Maximum number of atoms in the bilayer supercell
-THETA_MIN  = 0.0    # Minimum twist degree
-THETA_MAX  = 180.0  # Maximum twist degree
+THETA_MIN  = 0.0    # Minimum twist angle (degrees)
+THETA_MAX  = 180.0  # Maxximum twist angle (degrees)
 THETA_STEP = 0.1    # Twist angle search step (degrees)
 MAX_STRAIN = 0.05   # Maximum symmetric relative distance for vector coincidence
+TWIST_LIST_FILE = "TWIST_LIST.dat"
 
 def read_POSCAR(filepath):
     """Read a VASP POSCAR file and return its contents as a dictionary.
@@ -65,9 +69,6 @@ def read_POSCAR(filepath):
     with open(filepath, 'r') as poscar:
         lines = poscar.readlines()
 
-    # Parse the scaling factor (line 2):
-    # - 1 value  : uniform scalar; negative means target volume in Å**3
-    # - 3 values : per-axis scale applied row-wise to the lattice matrix
     if len(lines[1].split()) == 1:
         raw_scale = float(lines[1])
         raw_lattice_matrix = np.array([[float(x) for x in line.split()]
@@ -89,12 +90,9 @@ def read_POSCAR(filepath):
         print("ERROR! The scaling factor must be 1 or 3 components.")
         exit(1)
 
-    # Detect VASP4 vs VASP5 format by checking whether line 6 starts with a number.
-    # VASP4 has no element-symbol line, so the user is prompted for species names.
     elements = []
     is_number = lines[5].split()[0].isdecimal()
     if is_number:
-        # VASP4 format: no element line -> prompt user
         for i in range(len(lines[5].split())):
             while True:
                 name = input(f"Enter the name of species No. {i + 1:>3}: ").strip()
@@ -107,8 +105,6 @@ def read_POSCAR(filepath):
         selective_dynamics = lines[6].lower().startswith('s')
         position_start = 8 if selective_dynamics else 7
     else:
-        # VASP5 format: element symbols present.
-        # Strip potential PAW/GGA suffixes such as '_pv' or '/GGA'.
         raw_elements = lines[5].split()
         for name in raw_elements:
             elements.append(name.split('/')[0].split('_')[0])
@@ -116,24 +112,20 @@ def read_POSCAR(filepath):
         selective_dynamics = lines[7].lower().startswith('s')
         position_start = 9 if selective_dynamics else 8
 
-    # Read atomic positions
     total_atoms = sum(atom_counts)
     position_stop = position_start + total_atoms
 
     positions = np.array([[float(x) for x in lines[i].split()[:3]]
                           for i in range(position_start, position_stop)])
 
-    # Build a per-atom species list (e.g. ['Mo', 'Mo', 'S', 'S', 'S'])
     species = [x for i, x in enumerate(elements)
                for _ in range(atom_counts[i])]
 
-    # Read Selective Dynamics T/F flags if present
     flags = None
     if selective_dynamics:
         flags = np.array([[x for x in lines[i].split()[3:6]]
                           for i in range(position_start, position_stop)])
 
-    # Convert coordinates to both Direct and Cartesian representations
     is_direct = lines[position_start - 1].strip().lower().startswith('d')
     if is_direct:
         positions_direct = positions % 1.0
@@ -142,15 +134,15 @@ def read_POSCAR(filepath):
         positions_cartesian = positions * scale
         positions_direct = cartesian_to_direct(lattice_matrix, positions_cartesian)
 
-    return {"lattice_matrix":     lattice_matrix,
-            "elements":           elements,
-            "atom_counts":        atom_counts,
-            "total_atoms":        total_atoms,
+    return {"lattice_matrix":      lattice_matrix,
+            "elements":            elements,
+            "atom_counts":         atom_counts,
+            "total_atoms":         total_atoms,
             "positions_cartesian": positions_cartesian,
-            "positions_direct":   positions_direct,
-            "species":            species,
-            "selective_dynamics": selective_dynamics,
-            "flags":              flags if selective_dynamics else None}
+            "positions_direct":    positions_direct,
+            "species":             species,
+            "selective_dynamics":  selective_dynamics,
+            "flags":               flags if selective_dynamics else None}
 
 
 def direct_to_cartesian(lattice_matrix, positions_direct):
@@ -169,7 +161,7 @@ def direct_to_cartesian(lattice_matrix, positions_direct):
     """
 
     positions = positions_direct % 1.0
-    positions_cartesian = np.dot(positions, lattice_matrix)
+    positions_cartesian = positions @ lattice_matrix
 
     return positions_cartesian
 
@@ -189,7 +181,7 @@ def cartesian_to_direct(lattice_matrix, positions_cartesian):
     positions_direct : np.ndarray, shape (N, 3) — fractional coordinates in [0, 1)
     """
 
-    positions_direct = np.dot(positions_cartesian, np.linalg.inv(lattice_matrix)) % 1.0
+    positions_direct = (positions_cartesian @ np.linalg.inv(lattice_matrix)) % 1.0
 
     return positions_direct
 
@@ -219,7 +211,7 @@ def check_elements(elements):
         while True:
             sort_elements = input("Enter the desired element order (separate by space): ").split()
             if len(sort_elements) == 0:
-                print("Warning! Empty input — using default unique element order.\n")
+                print("Warning! Empty input — using default unique element order.")
                 return unique_elements.copy()
             if (len(sort_elements) == len(unique_elements) and
                     set(sort_elements) == set(unique_elements)):
@@ -264,10 +256,13 @@ def mapping_elements(elements, atom_counts, positions_cartesian, positions_direc
     new_atom_counts = atom_counts.copy()
     new_positions_cartesian = positions_cartesian.copy()
     new_positions_direct = positions_direct.copy()
-    new_species = species.copy()
-    new_flags = flags.copy() if selective_dynamics else None
+    new_species = list(species).copy()
+    new_flags = flags.copy() if (selective_dynamics and flags is not None) else None
 
-    # Group positions and flags by element symbol
+    # Group positions and flags by element symbol using the per-atom species list.
+    # This is correct even when positions are in layer order (not element order),
+    # because we look up each atom's element from species[i] rather than assuming
+    # the positions are already contiguous by element.
     elements_positions_cartesian = {}
     elements_positions_direct = {}
     elements_species = {}
@@ -282,11 +277,9 @@ def mapping_elements(elements, atom_counts, positions_cartesian, positions_direc
         if selective_dynamics and new_flags is not None:
             elements_flags.setdefault(element, []).append(new_flags[idx])
 
-    # Resolve canonical element order (prompts user if duplicates exist)
     if sort_elements is None:
         sort_elements = check_elements(elements)
 
-    # Rebuild arrays in the resolved order
     if sort_elements is not None:
         sort_positions_cartesian = []
         sort_positions_direct = []
@@ -297,24 +290,24 @@ def mapping_elements(elements, atom_counts, positions_cartesian, positions_direc
             sort_positions_cartesian.extend(elements_positions_cartesian[element])
             sort_positions_direct.extend(elements_positions_direct[element])
             sort_species.extend(elements_species[element])
-            if selective_dynamics:
+            if selective_dynamics and elements_flags is not None:
                 sort_flags.extend(elements_flags[element])
             sort_atom_counts.append(len(elements_positions_direct[element]))
 
         new_positions_cartesian = np.array(sort_positions_cartesian, dtype=float)
         new_positions_direct = np.array(sort_positions_direct, dtype=float)
         new_species = list(sort_species)
-        if selective_dynamics:
+        if selective_dynamics and sort_flags is not None:
             new_flags = np.array(sort_flags)
         new_atom_counts = sort_atom_counts
         new_elements = sort_elements
 
-    return {"elements":           new_elements,
-            "atom_counts":        new_atom_counts,
+    return {"elements":            new_elements,
+            "atom_counts":         new_atom_counts,
             "positions_cartesian": new_positions_cartesian,
-            "positions_direct":   new_positions_direct,
-            "species":            new_species,
-            "flags":              new_flags if selective_dynamics else None}
+            "positions_direct":    new_positions_direct,
+            "species":             new_species,
+            "flags":               new_flags if selective_dynamics else None}
 
 
 def define_labels(elements, atom_counts):
@@ -362,7 +355,7 @@ def write_POSCAR(filepath, lattice_matrix, elements, atom_counts,
     """
 
     with open(filepath, 'w') as o:
-        o.write("Generated by vaspStack.py code\n")
+        o.write("Generated by vaspTwist.py code\n")
         o.write(f"   {1.0:.14f}\n")
         for lattice in lattice_matrix:
             o.write(f"   {lattice[0]:20.16f}  {lattice[1]:20.16f}  {lattice[2]:20.16f}\n")
@@ -382,39 +375,6 @@ def write_POSCAR(filepath, lattice_matrix, elements, atom_counts,
                         f"   {label:>6s}\n")
 
 
-def write_output_list(filepath, output_records):
-    """Write a summary of all generated POSCAR files to a plain-text list file.
-
-    Each line contains the relative path to a POSCAR and its key parameters,
-    making it easy to feed into batch job scripts or review what was generated.
-
-    Format of each data line:
-        theta  atoms  stack  strain  cell_mismatch  indices1  indices2  path
-
-    Parameters
-    ----------
-    filepath       : str          — path to the output list file
-    output_records : list[dict]   — one dict per written POSCAR with keys:
-                                     path, theta, total_atoms, stack, strain,
-                                     cell_mismatch, indices1, indices2
-    """
-
-    with open(filepath, 'w') as o:
-        o.write("# Output list generated by vaspTwist.py\n")
-        o.write(f"# Total POSCAR files: {len(output_records)}\n")
-        o.write("#\n")
-        o.write(f"# {'Theta(deg)':>10}  {'Atoms':>6}"
-                f"  {'Stack':<10}  {'Strain(%)':>10}  {'CellMM':>8}"
-                f"  {'indices1':>20}  {'indices2':>20}  {'Path'}\n")
-        o.write("# " + "-" * 158 + "\n")
-        for rec in output_records:
-            i11, i12, i21, i22 = rec["indices1"]
-            j11, j12, j21, j22 = rec["indices2"]
-            o.write(f"  {rec['theta']:>10.4f}  {rec['total_atoms']:>6}"
-                    f"  {rec['stack']:<10}  {rec['strain']:>10.4f}  {rec['cell_mismatch']:>8.5f}"
-                    f"  {i11:>4} {i12:>4} {i21:>4} {i22:>4}"
-                    f"  {j11:>4} {j12:>4} {j21:>4} {j22:>4}"
-                    f"  {rec['path']}\n")
 
 
 def unwrap(positions_direct):
@@ -442,8 +402,7 @@ def unwrap(positions_direct):
 
 
 def center_sheet(positions_direct):
-    """Shift a 2D sheet so the vacuum direction is centered at 0.5 and the
-    periodic directions start at origin.
+    """Shift a 2D sheet so the vacuum direction is centered at z = 0.5.
 
     The vacuum axis is assumed to be z (index 2).
 
@@ -517,22 +476,10 @@ def find_moire_vectors_chunk(bottom_lattice_matrix, top_lattice_matrix,
 
     results = []
     for theta in theta_chunk:
-        new_lattice_matrix = np.dot(top_lattice_matrix, rotation_matrix(theta).T)
+        new_lattice_matrix = rotation_matrix(theta) @ top_lattice_matrix
 
         for n1 in combined_list:
             for n2 in combined_list:
-                # if abs(n1) - abs(n2) != 0:
-                #     for m1 in combined_list:
-                #         for m2 in combined_list:
-                #             if abs(m1) - abs(m2) != 0:
-                #                 bottom_vector_1 = n1 * bottom_lattice_matrix[0, 0] + n2 * bottom_lattice_matrix[1, 0]
-                #                 bottom_vector_2 = n1 * bottom_lattice_matrix[0, 1] + n2 * bottom_lattice_matrix[1, 1]
-                #                 top_vector_1 = m1 * new_lattice_matrix[0, 0] + m2 * new_lattice_matrix[1, 0]
-                #                 top_vector_2 = m1 * new_lattice_matrix[0, 1] + m2 * new_lattice_matrix[1, 1]
-                #                 epsilon = np.sqrt(((bottom_vector_1 - top_vector_1) ** 2 + (bottom_vector_2 - top_vector_2) ** 2) / 
-                #                                   ((bottom_vector_1 + top_vector_1) ** 2 + (bottom_vector_2 + top_vector_2) ** 2))
-                #                 if epsilon <= max_strain:
-                #                     results.append((theta, n1, n2, m1, m2, ))
                 v_layer1 = n1 * bottom_lattice_matrix[0] + n2 * bottom_lattice_matrix[1]
                 norm_v1 = np.linalg.norm(v_layer1)
                 if norm_v1 == 0.0:
@@ -545,7 +492,8 @@ def find_moire_vectors_chunk(bottom_lattice_matrix, top_lattice_matrix,
                             continue
                         rel_distance = np.linalg.norm(v_layer1 - v_layer2) / (norm_v1 + norm_v2)
                         if rel_distance <= max_strain:
-                            results.append((theta, n1, n2, m1, m2, rel_distance, v_layer1, v_layer2))
+                            results.append((theta, n1, n2, m1, m2,
+                                            rel_distance, v_layer1, v_layer2))
 
     return results
 
@@ -571,7 +519,7 @@ def find_moire_vectors(bottom_lattice_matrix, top_lattice_matrix,
     moire_vectors : list of tuples (theta, n1, n2, m1, m2, rel_distance, v_layer1, v_layer2)
     """
 
-    theta_array = np.arange(theta_min, theta_max + theta_step, theta_step)
+    theta_array = np.arange(theta_min, theta_max, theta_step)
 
     # Full range -n_max to n_max including 0, so (1,0) and (0,1) are always included.
     # Zero-vector (0,0) is rejected inside find_moire_vectors_chunk by the norm_v == 0 check.
@@ -594,7 +542,8 @@ def find_moire_vectors(bottom_lattice_matrix, top_lattice_matrix,
     return moire_vectors
 
 
-def build_supercell(lattice_matrix, positions_cartesian, species, selective_dynamics, flags, A1, A2):
+def build_supercell(lattice_matrix, positions_cartesian, species,
+                    selective_dynamics, flags, A1, A2):
     """Tile a primitive cell into a moiré supercell defined by vectors A1 and A2.
 
     Parameters
@@ -611,7 +560,9 @@ def build_supercell(lattice_matrix, positions_cartesian, species, selective_dyna
     dict with keys: lattice_matrix, positions_direct, species, flags
     """
 
-    n_rep = int(np.ceil(max(np.linalg.norm(A1), np.linalg.norm(A2)) / min(np.linalg.norm(lattice_matrix[0]), np.linalg.norm(lattice_matrix[1])))) + 2
+    n_rep = int(np.ceil(max(np.linalg.norm(A1), np.linalg.norm(A2)) /
+                        min(np.linalg.norm(lattice_matrix[0]),
+                            np.linalg.norm(lattice_matrix[1])))) + 2
 
     supercell_positions_cartesian = []
     supercell_species = []
@@ -630,7 +581,7 @@ def build_supercell(lattice_matrix, positions_cartesian, species, selective_dyna
 
     new_lattice_matrix = np.array([A1, A2, lattice_matrix[2]])
 
-    new_positions_direct = np.dot(supercell_positions_cartesian, np.linalg.inv(new_lattice_matrix))
+    new_positions_direct = cartesian_to_direct(new_lattice_matrix, supercell_positions_cartesian)
     inside_mask = ((new_positions_direct[:, 0] >= -1e-8) &
                    (new_positions_direct[:, 0] <   1.0 - 1e-8) &
                    (new_positions_direct[:, 1] >= -1e-8) &
@@ -650,41 +601,56 @@ def build_supercell(lattice_matrix, positions_cartesian, species, selective_dyna
             "flags":            filtered_flags if selective_dynamics else None}
 
 
-def build_twisted_bilayer(layer1, layer2_rotated, selective_dynamics):
+def build_twisted_bilayer(layer1, layer2_rotated, selective_dynamics,
+                          A1_bottom, A2_bottom, A1_top, A2_top):
     """Stack two supercell layers into a twisted bilayer with a 3.5 Å interlayer gap.
+
+    Uses a common averaged lattice  A_common = (A_bottom + A_top) / 2  so that
+    neither layer is privileged and both are strained equally to the common cell.
+    Each layer's atoms are expressed in Cartesian coordinates from their own
+    matched supercell vectors, then re-expressed in the common lattice.
 
     Parameters
     ----------
-    layer1             : dict
-    layer2_rotated     : dict
+    layer1             : dict — bottom layer from build_supercell (A1_bottom, A2_bottom)
+    layer2_rotated     : dict — top layer from build_supercell (A1_bottom, A2_bottom)
     selective_dynamics : bool
+    A1_bottom, A2_bottom : np.ndarray (3,) — bottom matched supercell vectors
+    A1_top,    A2_top    : np.ndarray (3,) — top matched supercell vectors
 
     Returns
     -------
     dict with keys: lattice_matrix, positions_direct, species, flags
     """
-    
-    new_lattice_matrix = (layer1["lattice_matrix"] + layer2_rotated["lattice_matrix"]) / 2
 
+    # Common averaged lattice — neither layer is privileged
+    A1_common = (A1_bottom + A1_top) / 2.0
+    A2_common = (A2_bottom + A2_top) / 2.0
+    a3_common = layer1["lattice_matrix"][2].copy()
+    common_lattice = np.array([A1_common, A2_common, a3_common])
+
+    # Convert each layer's atoms from their own supercell to Cartesian
     layer1_cartesian = direct_to_cartesian(layer1["lattice_matrix"], layer1["positions_direct"])
     layer2_cartesian = direct_to_cartesian(layer2_rotated["lattice_matrix"], layer2_rotated["positions_direct"])
 
+    # Stack with interlayer gap
     z_max_layer1 = np.max(layer1_cartesian[:, 2])
     z_min_layer2 = np.min(layer2_cartesian[:, 2])
     interlayer_gap = 3.5
     layer2_cartesian[:, 2] += z_max_layer1 - z_min_layer2 + interlayer_gap
 
-    combined_positions_cartesian = np.vstack((layer1_cartesian, layer2_cartesian))
+    combined_cartesian = np.vstack((layer1_cartesian, layer2_cartesian))
     combined_species = list(layer1["species"]) + list(layer2_rotated["species"])
 
     combined_flags = None
     if selective_dynamics and layer1["flags"] is not None and layer2_rotated["flags"] is not None:
         combined_flags = np.vstack((layer1["flags"], layer2_rotated["flags"]))
 
-    combined_positions_direct = cartesian_to_direct(layer1["lattice_matrix"], combined_positions_cartesian)
+    # Express all atoms in the common lattice and center along z-axis
+    combined_positions_direct = cartesian_to_direct(common_lattice, combined_cartesian)
     combined_positions_direct = center_sheet(combined_positions_direct)
 
-    return {"lattice_matrix":   new_lattice_matrix,
+    return {"lattice_matrix":   common_lattice,
             "positions_direct": combined_positions_direct,
             "species":          combined_species,
             "flags":            combined_flags if selective_dynamics else None}
@@ -729,7 +695,7 @@ def metric_tensor(e1, e2, e3):
     G = np.zeros((3, 3))
     for i in range(3):
         for j in range(3):
-            G[i, j] = np.dot(vecs[i], vecs[j])
+            G[i, j] = vecs[i] @ vecs[j]
 
     return G
 
@@ -776,8 +742,8 @@ def calculate_strain(A1_bottom, A2_bottom, A1_top, A2_top):
     R_bottom = np.linalg.cholesky(G_bottom).T
     R_top    = np.linalg.cholesky(G_top).T
 
-    F = np.dot(R_top, np.linalg.inv(R_bottom)) - np.eye(3)
-    lagrangian = 0.5 * (F + F.T + np.dot(F.T, F))
+    F = (R_top @ np.linalg.inv(R_bottom)) - np.eye(3)
+    lagrangian = 0.5 * (F + F.T + F.T @ F)
 
     eigenvalues = np.linalg.eigvalsh(lagrangian)
     deformation = np.sqrt(np.sum(eigenvalues ** 2) / 3.0)
@@ -785,92 +751,48 @@ def calculate_strain(A1_bottom, A2_bottom, A1_top, A2_top):
     return float(deformation)
 
 
-def calculate_area_ratio(A1, A2, a1, a2):
-    """Compute the ratio of supercell area to primitive cell area.
+
+def canonicalize_cell(A1, A2):
+    """Build a canonical key for a 2D supercell that is invariant to row order
+    and vector sign, so geometrically equivalent cells are treated as duplicates.
+
+    Tries all combinations of sign and row order, rounds to 6 decimal places,
+    and returns the lexicographically smallest flattened tuple as the key.
 
     Parameters
     ----------
-    A1, A2 : np.ndarray (3,)
-    a1, a2 : np.ndarray (3,)
+    A1, A2 : np.ndarray (3,) — supercell lattice vectors (only xy used)
 
     Returns
     -------
-    float
+    tuple — canonical hashable key
     """
 
-    supercell_area = abs(A1[0] * A2[1] - A1[1] * A2[0])
-    primitive_area = abs(a1[0] * a2[1] - a1[1] * a2[0])
+    v1 = A1[:2]
+    v2 = A2[:2]
 
-    if primitive_area < 1e-12 or supercell_area < 1e-12:
-        return 0.0
+    candidates = []
+    for s1 in (-1.0, 1.0):
+        for s2 in (-1.0, 1.0):
+            candidates.append(tuple(np.round(np.concatenate([s1 * v1, s2 * v2]), 6)))
+            candidates.append(tuple(np.round(np.concatenate([s2 * v2, s1 * v1]), 6)))
 
-    return round(supercell_area / primitive_area)
-
-
-def relative_cell_mismatch(L_bottom, L_top):
-    """Symmetric relative mismatch between two 2D supercell matrices.
-
-    Measures how well the full cell (both vectors together) matches, beyond
-    the per-vector check already done in find_moire_vectors_chunk.
-    Two individually good vectors can still pair into a poor supercell if they
-    point in incompatible directions; this catches that case.
-
-        mismatch = |L_bottom - L_top| / (|L_bottom| + |L_top|)
-
-    where norms are Frobenius (treating the 2×2 matrix as a flat vector).
-
-    Parameters
-    ----------
-    L_bottom : np.ndarray (2, 2) — bottom supercell rows [A1_bottom, A2_bottom]
-    L_top    : np.ndarray (2, 2) — top supercell rows [A1_top, A2_top]
-
-    Returns
-    -------
-    float
-    """
-
-    norm_bottom = np.linalg.norm(L_bottom)
-    norm_top    = np.linalg.norm(L_top)
-
-    if norm_bottom == 0.0 or norm_top == 0.0:
-        return np.inf
-
-    return np.linalg.norm(L_bottom - L_top) / (norm_bottom + norm_top)
-
-
-# def canonicalize_cell(A1, A2):
-#     """Build a canonical key for a 2D supercell that is invariant to row order
-#     and vector sign, so geometrically equivalent cells are treated as duplicates.
-
-#     Tries all combinations of sign and row order, rounds to 6 decimal places,
-#     and returns the lexicographically smallest flattened tuple as the key.
-
-#     Parameters
-#     ----------
-#     A1, A2 : np.ndarray (3,) — supercell lattice vectors (only xy used)
-
-#     Returns
-#     -------
-#     tuple — canonical hashable key
-#     """
-
-#     v1 = A1[:2]
-#     v2 = A2[:2]
-
-#     candidates = []
-#     for s1 in (-1.0, 1.0):
-#         for s2 in (-1.0, 1.0):
-#             candidates.append(tuple(np.round(np.concatenate([s1 * v1, s2 * v2]), 6)))
-#             candidates.append(tuple(np.round(np.concatenate([s2 * v2, s1 * v1]), 6)))
-
-#     return min(candidates)
+    return min(candidates)
 
 
 def build_candidates_for_theta(theta_key, vec_list, bottom_lattice_matrix, bottom_positions_cartesian,
-                                bottom_species, bottom_selective_dynamics, bottom_flags,
-                                top_lattice_matrix, top_positions_cartesian, top_species,
-                                top_selective_dynamics, top_flags, sort_elements, known_elements):
+                               bottom_species, bottom_selective_dynamics, bottom_flags,
+                               top_lattice_matrix, top_positions_cartesian, top_species,
+                               top_selective_dynamics, top_flags, sort_elements, known_elements):
     """Build and filter bilayer supercell candidates for a single twist angle.
+
+    Implements the CellMatch (match_cells.py) filter pipeline:
+        1. omjer1 = round(|A1×A2| / |a1×a2|) >= 1   (bottom area ratio is positive integer)
+        2. omjer2 = round(|G1×G2| / |b1×b2|) >= 1   (top area ratio is positive integer)
+        3. total_atoms = n_bottom*omjer1 + n_top*omjer2 <= MAX_ATOMS
+        4. canonicalize_cell deduplication (per-theta)
+    Atom count is computed arithmetically from omjer1/omjer2 — build_supercell is
+    only called after all filters pass, keeping the loop fast.
 
     Supports both homobilayer (bottom == top) and heterobilayer (different layers).
 
@@ -895,106 +817,120 @@ def build_candidates_for_theta(theta_key, vec_list, bottom_lattice_matrix, botto
     -------
     theta_candidates : list[dict]
     """
-    
+
     a1 = bottom_lattice_matrix[0]
     a2 = bottom_lattice_matrix[1]
     b1 = top_lattice_matrix[0]
     b2 = top_lattice_matrix[1]
 
-    rotated_top_lattice = np.dot(top_lattice_matrix, rotation_matrix(theta_key).T)
+    # Primitive cell cross products (z-component of 2D cross product)
+    prim_cross_bottom = a1[0] * a2[1] - a1[1] * a2[0]
+    prim_cross_top    = b1[0] * b2[1] - b1[1] * b2[0]
+
+    rotated_top_lattice = rotation_matrix(theta_key) @ top_lattice_matrix
 
     selective_dynamics = bottom_selective_dynamics or top_selective_dynamics
 
-    # Sort by (rel_dist, |n1|+|n2|, negative-index penalty) so that at equal
-    # mismatch the primitive vectors (1,0) and (0,1) are paired first,
-    # giving indices1 = (1,0,0,1) and indices2 = (1,0,0,1) at θ=0°.
-    vec_list = sorted(vec_list, key=lambda x: (x[0], abs(x[3]) + abs(x[4]), -x[3], -x[4]))
+    # Sort by rel_dist only — CellMatch convention (match_cells.py).
+    # The cross-product filter below rejects degenerate (parallel) pairs.
+    vec_list = sorted(vec_list, key=lambda x: x[0])
 
     theta_candidates = []
-    # seen_configurations = set()
+    seen_configurations = set()
 
     for i in range(len(vec_list)):
         rel_dist_i, A1_bottom, A1_top, n1_i, n2_i, m1_i, m2_i = vec_list[i]
-        for j in range(i + 1, len(vec_list)):
+        for j in range(i, len(vec_list)):   # j >= i, matching CellMatch; j==i rejected by cross_z check
             rel_dist_j, A2_bottom, A2_top, n1_j, n2_j, m1_j, m2_j = vec_list[j]
-            
-            # Non-degenerate bottom supercell
-            # bottom_ratio = |A1×A2| / |a1×a2|  must be a positive integer
+
             A1_vec = A1_bottom
             A2_vec = A2_bottom
-            bottom_ratio = calculate_area_ratio(A1_vec, A2_vec, a1, a2)
-            if bottom_ratio < 1:
+
+            # ------------------------------------------------------------------
+            # CellMatch filter 1: non-degenerate bottom supercell
+            # omjer1 = |A1×A2| / |a1×a2|  must be a positive integer
+            # (equivalent to match_cells.py: omjer1 = round(abs(cross/prim_cross)))
+            # ------------------------------------------------------------------
+            sup_cross_bottom = A1_vec[0] * A2_vec[1] - A1_vec[1] * A2_vec[0]
+            if abs(sup_cross_bottom) < 1e-10 or abs(prim_cross_bottom) < 1e-10:
                 continue
-            
-            # Non-degenerate top supercell
-            # top_ratio = |G1×G2| / |b1×b2| using the rotated top vectors
+            omjer1 = round(abs(sup_cross_bottom / prim_cross_bottom))
+            if omjer1 < 1:
+                continue
+
+            # ------------------------------------------------------------------
+            # CellMatch filter 2: non-degenerate top supercell
+            # omjer2 = |G1×G2| / |b1×b2| using the rotated top vectors
+            # ------------------------------------------------------------------
             G1_vec = A1_top
             G2_vec = A2_top
-            top_ratio = calculate_area_ratio(G1_vec, G2_vec, b1, b2)
-            if top_ratio < 1:
+            sup_cross_top = G1_vec[0] * G2_vec[1] - G1_vec[1] * G2_vec[0]
+            if abs(sup_cross_top) < 1e-10 or abs(prim_cross_top) < 1e-10:
                 continue
-            
-            # Total atom count within MAX_ATOMS
+            omjer2 = round(abs(sup_cross_top / prim_cross_top))
+            if omjer2 < 1:
+                continue
+
+            # ------------------------------------------------------------------
+            # CellMatch filter 3: total atom count within MAX_ATOMS
             # Computed arithmetically — no build_supercell needed at this stage
-            n_bottom_primitive = len(bottom_species)
-            n_top_primitive    = len(top_species)
-            total_atoms_bilayer = n_bottom_primitive * bottom_ratio + n_top_primitive * top_ratio
+            # ------------------------------------------------------------------
+            n_bottom_prim = len(bottom_species)
+            n_top_prim    = len(top_species)
+            total_atoms_bilayer = n_bottom_prim * omjer1 + n_top_prim * omjer2
             if total_atoms_bilayer > MAX_ATOMS:
                 continue
 
-            # # Deduplicate using canonical cell key (invariant to row order and sign)
-            # config_key = canonicalize_cell(A1_vec, A2_vec)
-            # if config_key in seen_configurations:
-            #     continue
-            # seen_configurations.add(config_key)
-            
-            # Compute cell mismatch and Lagrangian strain (after cheap filters)
-            L_bottom = np.array([A1_bottom[:2], A2_bottom[:2]])
-            L_top    = np.array([A1_top[:2],    A2_top[:2]])
-            cell_mm  = relative_cell_mismatch(L_bottom, L_top)
+            # ------------------------------------------------------------------
+            # Deduplicate using canonical cell key (invariant to row order/sign)
+            # ------------------------------------------------------------------
+            config_key = canonicalize_cell(A1_vec, A2_vec)
+            if config_key in seen_configurations:
+                continue
+            seen_configurations.add(config_key)
+
+            # ------------------------------------------------------------------
+            # Compute Lagrangian strain (after cheap filters)
+            # ------------------------------------------------------------------
             lagrangian_strain = calculate_strain(A1_bottom, A2_bottom, A1_top, A2_top)
 
+            # ------------------------------------------------------------------
+            # Build supercells — only reached after all filters pass
+            # ------------------------------------------------------------------
             layer1 = build_supercell(bottom_lattice_matrix, bottom_positions_cartesian,
                                       bottom_species, bottom_selective_dynamics, bottom_flags,
                                       A1_vec, A2_vec)
 
-            # Top layer is tiled into the same supercell parallelogram (A1_vec, A2_vec).
-            # A1_top / A2_top are only used for strain calculation — they are the matched
-            # top-layer vectors, slightly different from A1_vec/A2_vec by construction.
-            # Using them as the tiling cell would produce a different parallelogram,
-            # causing atom count mismatches and half-empty bilayers.
-            center = np.mean(top_positions_cartesian, axis=0)
-            rotate_positions_cartesian = np.dot(top_positions_cartesian - center, rotation_matrix(theta_key).T) + center
-            layer2_rotated = build_supercell(rotated_top_lattice, rotate_positions_cartesian,
+            # Top layer: rotation applied to both lattice and positions so they
+            # remain in the same rotated Cartesian frame.
+            top_positions_rotated = top_positions_cartesian @ rotation_matrix(theta_key).T
+            layer2_rotated = build_supercell(rotated_top_lattice, top_positions_rotated,
                                               top_species, top_selective_dynamics, top_flags,
                                               A1_vec, A2_vec)
 
-            bilayer = build_twisted_bilayer(layer1, layer2_rotated, selective_dynamics)
+            bilayer = build_twisted_bilayer(layer1, layer2_rotated, selective_dynamics,
+                                             A1_bottom, A2_bottom, A1_top, A2_top)
 
             order_ref = sort_elements if sort_elements is not None else list(dict.fromkeys(known_elements))
             elements_order, atom_counts = collect_elements_and_counts(
                 bilayer["species"], order_ref)
 
-            bilayer_positions_cartesian = direct_to_cartesian(bilayer["lattice_matrix"], bilayer["positions_direct"])
-
-            theta_candidates.append({"theta":                       theta_key,
-                                     "A1_vec":                      A1_vec,
-                                     "A2_vec":                      A2_vec,
-                                     "strain":                      lagrangian_strain,
-                                     "cell_mismatch":               cell_mm,
-                                     "area_ratio_bottom":           bottom_ratio,
-                                     "area_ratio_top":              top_ratio,
-                                     "n_bottom":                    len(layer1["species"]),
-                                     "indices1":                    (n1_i, n2_i, n1_j, n2_j),
-                                     "indices2":                    (m1_i, m2_i, m1_j, m2_j),
-                                     "bilayer_lattice_matrix":      bilayer["lattice_matrix"],
-                                     "bilayer_positions_direct":    bilayer["positions_direct"],
-                                     "bilayer_positions_cartesian": bilayer_positions_cartesian,
-                                     "bilayer_species":             bilayer["species"],
-                                     "bilayer_flags":               bilayer["flags"],
-                                     "elements_order":              elements_order,
-                                     "total_atoms":                 total_atoms_bilayer,
-                                     "selective_dynamics":          selective_dynamics})
+            theta_candidates.append({"theta":                  theta_key,
+                                      "A1_vec":                 A1_vec,
+                                      "A2_vec":                 A2_vec,
+                                      "strain":                 lagrangian_strain,
+                                      "area_ratio_bottom":      omjer1,
+                                      "area_ratio_top":         omjer2,
+                                      "n_bottom":               len(layer1["species"]),
+                                      "indices1":               (n1_i, n2_i, n1_j, n2_j),
+                                      "indices2":               (m1_i, m2_i, m1_j, m2_j),
+                                      "bilayer_lattice_matrix": bilayer["lattice_matrix"],
+                                      "bilayer_positions":      bilayer["positions_direct"],
+                                      "bilayer_species":        bilayer["species"],
+                                      "bilayer_flags":          bilayer["flags"],
+                                      "elements_order":         elements_order,
+                                      "total_atoms":            total_atoms_bilayer,
+                                      "selective_dynamics":     selective_dynamics})
 
     return theta_candidates
 
@@ -1006,8 +942,8 @@ def get_2d_lattice_type(lattice_matrix):
     to identify the crystal system according to the standard 2D classification:
 
         hexagonal   : γ = 60° or 120°  and  a = b
-        square      : γ = 90°          and  a = b
-        rectangular : γ = 90°          and  a ≠ b
+        square      : γ = 90°           and  a = b
+        rectangular : γ = 90°           and  a ≠ b
         oblique     : all other cases
 
     Parameters
@@ -1021,9 +957,8 @@ def get_2d_lattice_type(lattice_matrix):
 
     length_a = np.linalg.norm(lattice_matrix[0])
     length_b = np.linalg.norm(lattice_matrix[1])
-    gamma = np.degrees(np.arccos(np.clip(
-        np.dot(lattice_matrix[0], lattice_matrix[1]) /
-        (length_a * length_b), -1.0, 1.0)))
+    gamma = np.degrees(np.arccos(np.clip((lattice_matrix[0] @ lattice_matrix[1]) /
+                                         (length_a * length_b), -1.0, 1.0)))
 
     if np.abs(gamma - 90.0) < 1e-5:
         return 'square' if np.abs(length_a - length_b) < 1e-8 else 'rectangular'
@@ -1072,11 +1007,127 @@ def get_shift_grid(lattice_type):
                 (0.5, 0.5, "AC")]
 
 
-def prompt_selection(candidates):
-    """Display a numbered table of candidates and prompt the user to select which to generate.
+def write_twist_list(filepath, candidates, bottom_file, top_file):
+    """Write all search candidates to TWIST_LIST.dat, sorted by strain.
 
-    Shows how many POSCAR files will be written per candidate (one per stacking point).
-    The user can enter specific indices, 'all', or 'none' to skip generation.
+    Format mirrors CellMatch's results.dat with an added Theta column.
+    The header records the input filenames so 'generate' mode can verify
+    the same files are used.
+
+    Parameters
+    ----------
+    filepath     : str
+    candidates   : list[dict]  — sorted by strain (ascending)
+    bottom_file  : str
+    top_file     : str
+    """
+
+    SEP = "-" * 109
+
+    with open(filepath, 'w') as o:
+        o.write("# TWIST_LIST generated by vaspTwist.py\n")
+        o.write(f"# bottom = {bottom_file}\n")
+        o.write(f"# top    = {top_file}\n")
+        o.write(f"# Total candidates: {len(candidates)}\n")
+        o.write(f"# {'---':->52} RESULTS {'---':->49}\n")
+        o.write(f"# {SEP}\n")
+        o.write(f"# {'|':1}{'index':^7}{'|':1}{'theta (deg)':^18}{'|':1}{'strain':^18}{'|':1}"
+                f"{'atoms':^9}{'|':1}{'surf_ratio':^12}{'|':1}"
+                f"{'indices1':^23}{'|':1}{'indices2':^23}{'|':1}\n")
+        o.write(f"# {SEP}\n")
+        for no, c in enumerate(candidates, start=1):
+            i11, i12, i21, i22 = c["indices1"]
+            j11, j12, j21, j22 = c["indices2"]
+            r1, r2 = c["area_ratio_bottom"], c["area_ratio_top"]
+            o.write(f"| {no:>6}  |  {c['theta']:>14.8f}  |  {c['strain']:>14.8f}  |"
+                    f"  {c['total_atoms']:>6}   |"
+                    f"  {r1:>4}  {r2:>4}  |"
+                    f"  {i11:>4} {i12:>4} {i21:>4} {i22:>4}  |"
+                    f"  {j11:>4} {j12:>4} {j21:>4} {j22:>4}  |\n")
+        o.write(f"# {SEP}\n")
+
+
+def read_twist_list_header(filepath):
+    """Read only the header of TWIST_LIST.dat to extract input filenames.
+
+    Parameters
+    ----------
+    filepath : str
+
+    Returns
+    -------
+    bottom_file : str
+    top_file    : str
+    """
+
+    bottom_file = None
+    top_file    = None
+    with open(filepath, 'r') as f:
+        for line in f:
+            if line.startswith("# bottom ="):
+                bottom_file = line.split("=", 1)[1].strip()
+            elif line.startswith("# top    ="):
+                top_file = line.split("=", 1)[1].strip()
+            if bottom_file is not None and top_file is not None:
+                break
+    return bottom_file, top_file
+
+
+def write_output_list(filepath, output_records):
+    """Write a summary of all generated POSCAR files to a plain-text list file.
+
+    Each line contains the relative path to a POSCAR and its key parameters.
+
+    Parameters
+    ----------
+    filepath       : str
+    output_records : list[dict]
+    """
+
+    with open(filepath, 'w') as o:
+        o.write("# POSCAR output list generated by vaspTwist.py\n")
+        o.write(f"# Total POSCAR files: {len(output_records)}\n")
+        o.write("#\n")
+        o.write(f"# {'Theta(deg)':>10}  {'Atoms':>6}"
+                f"  {'Stack':<12}  {'Strain':>12}"
+                f"  {'indices1':>20}  {'indices2':>20}  {'Path'}\n")
+        o.write("# " + "-" * 150 + "\n")
+        for rec in output_records:
+            i11, i12, i21, i22 = rec["indices1"]
+            j11, j12, j21, j22 = rec["indices2"]
+            o.write(f"  {rec['theta']:>10.4f}  {rec['total_atoms']:>6}"
+                    f"  {rec['stack']:<12}  {rec['strain']:>12.8f}"
+                    f"  {i11:>4} {i12:>4} {i21:>4} {i22:>4}"
+                    f"  {j11:>4} {j12:>4} {j21:>4} {j22:>4}"
+                    f"  {rec['path']}\n")
+
+
+def display_candidates(candidates):
+    """Print a numbered table of candidates."""
+
+    print(f"\nFound {len(candidates)} candidate(s) with <= {MAX_ATOMS} atoms:\n")
+    print(f"  {'No.':>4}  {'Theta (deg)':>12}  {'Atoms':>5}  {'Ratio1':>6}  {'Ratio2':>6}"
+          f"  {'Strain':>14}"
+          f"  {'|A1| (Ang)':>10}  {'|A2| (Ang)':>10}  {'Lattice':>12}  {'Stackings':>9}"
+          f"  {'indices1':>20}  {'indices2':>20}")
+    print("  " + "-" * 150)
+    for index, c in enumerate(candidates):
+        norm_A1      = np.linalg.norm(c["A1_vec"])
+        norm_A2      = np.linalg.norm(c["A2_vec"])
+        lattice_type = get_2d_lattice_type(c["bilayer_lattice_matrix"])
+        n_stackings  = len(get_shift_grid(lattice_type))
+        i11, i12, i21, i22 = c["indices1"]
+        j11, j12, j21, j22 = c["indices2"]
+        print(f"  {index + 1:>4}  {c['theta']:>12.4f}  {c['total_atoms']:>5}"
+              f"  {c['area_ratio_bottom']:>6}  {c['area_ratio_top']:>6}"
+              f"  {c['strain']:>14.8f}"
+              f"  {norm_A1:>10.4f}  {norm_A2:>10.4f}  {lattice_type:>12}  {n_stackings:>9}"
+              f"  {i11:>4} {i12:>4} {i21:>4} {i22:>4}"
+              f"  {j11:>4} {j12:>4} {j21:>4} {j22:>4}")
+
+
+def prompt_selection(candidates):
+    """Prompt the user to select candidates to generate.
 
     Parameters
     ----------
@@ -1084,33 +1135,8 @@ def prompt_selection(candidates):
 
     Returns
     -------
-    chosen : list[int] — zero-based indices of selected candidates (empty list if none)
+    chosen : list[int] — zero-based indices of selected candidates
     """
-
-    print(f"\nFound {len(candidates)} candidate(s) with <= {MAX_ATOMS} atoms:\n")
-    print(f"{'No.':>4}  {'Angle':>5}  {'N':>4}  {'|A1|':>9}  {'|A2|':>9}"
-          f"  {'Ratio1':>6}  {'Ratio2':>6}"
-          f"  {'Strain':>6}  {'Mismatch':>8}  {'Lattice type':>12}"
-          f"  {'indices1':>20}  {'indices2':>20}")
-    print("-" * 128)
-    for index, candidate in enumerate(candidates):
-        theta        = candidate["theta"]
-        total_atoms  = candidate["total_atoms"]
-        norm_A1      = np.linalg.norm(candidate["A1_vec"])
-        norm_A2      = np.linalg.norm(candidate["A2_vec"])
-        ratio1       = candidate["area_ratio_bottom"]
-        ratio2       = candidate["area_ratio_top"]
-        strain       = candidate["strain"] * 100.0
-        cell_mm      = candidate["cell_mismatch"]
-        lattice_type = get_2d_lattice_type(candidate["bilayer_lattice_matrix"])
-        i11, i12, i21, i22 = candidate["indices1"]
-        j11, j12, j21, j22 = candidate["indices2"]
-        print(f"{index + 1:>4}  {theta:>5.1f}  {total_atoms:>4}"
-              f"  {norm_A1:>9.4f}  {norm_A2:>9.4f}  {ratio1:>6}  {ratio2:>6}"
-              f"  {strain:>6.4f}%  {cell_mm:>8.5f}  {lattice_type:>12}"
-              f"  {i11:>4} {i12:>4} {i21:>4} {i22:>4}"
-              f"  {j11:>4} {j12:>4} {j21:>4} {j22:>4}")
-    print("-" * 128)
 
     total_poscars = sum(
         len(get_shift_grid(get_2d_lattice_type(c["bilayer_lattice_matrix"])))
@@ -1134,34 +1160,29 @@ def prompt_selection(candidates):
             print("ERROR! Enter integers separated by spaces, 'all', or 'none'.")
 
 
-def main():
-    """Parse arguments, search moire vector, build bilayer, and write outputs"""
+def run_search(bottom, top, sort_elements, known_elements):
+    """Run the full moiré vector search and candidate-building pipeline.
 
-    if '-h' in argv or '--help' in argv or len(argv) not in (2, 3):
-        usage()
+    Returns candidates sorted by strain (ascending), one per twist angle
+    (keeping the smallest-atom candidate for each theta).
 
-    working_dir = os.getcwd()
-    bottom = read_POSCAR(argv[1])
-    top    = read_POSCAR(argv[2]) if len(argv) == 3 else bottom
-    is_hetero = len(argv) == 3
+    Parameters
+    ----------
+    bottom, top   : dict        — from read_POSCAR
+    sort_elements : list or None
+    known_elements : list[str]
 
-    if is_hetero:
-        print(f"\nHeterobilayer mode: {argv[1]} + {argv[2]}")
-    else:
-        print(f"\nHomobilayer mode: {argv[1]}")
+    Returns
+    -------
+    candidates : list[dict]  — sorted by strain
+    """
 
-    bilayer_elements = bottom["elements"] + top["elements"]
-    sort_elements = check_elements(bilayer_elements)
-    known_elements = sort_elements if sort_elements is not None else bilayer_elements
-
-    # Derive N_MAX from primitive cell sizes and the hardcoded MAX_ATOMS limit.
-    # With indices up to N_MAX, the largest supercell has N_MAX**2 × primitive_atoms atoms.
-    # So: N_MAX = ceil(sqrt(MAX_ATOMS / (bottom_atoms + top_atoms))), minimum 1.
     primitive_atoms = bottom["total_atoms"] + top["total_atoms"]
     n_max = max(1, int(np.ceil(np.sqrt(MAX_ATOMS / primitive_atoms))))
-    print(f"Auto-detected N_MAX = {n_max}")
+    print(f"Auto-detected N_MAX = {n_max}"
+          f"  (MAX_ATOMS={MAX_ATOMS} / {primitive_atoms} primitive atoms, ceil(sqrt) → {n_max})")
 
-    print(f"Searching for commensurate moiré vectors ({0:>4.1f} to {180:>4.1f} deg, step = {THETA_STEP:>4.1f} deg)...")
+    print(f"Searching moiré vectors ({THETA_MIN:.1f} to {THETA_MAX:.1f} deg, step = {THETA_STEP:.1f} deg)...")
     moire_vectors = find_moire_vectors(bottom["lattice_matrix"], top["lattice_matrix"],
                                        THETA_MIN, THETA_MAX, THETA_STEP, n_max)
 
@@ -1169,9 +1190,8 @@ def main():
         print("No commensurate moiré vectors found with the given parameters.")
         exit(0)
 
-    print(f"Found {len(moire_vectors)} raw result(s). Filtering candidates (<= {MAX_ATOMS} atoms)...\n")
+    print(f"Found {len(moire_vectors)} raw vector pair(s). Building candidates (<= {MAX_ATOMS} atoms)...\n")
 
-    # Group coincident vectors by theta
     vectors_by_theta = {}
     for result in moire_vectors:
         theta    = result[0]
@@ -1197,42 +1217,55 @@ def main():
              for theta_key, vec_list in vectors_by_theta.items()]
         )
 
-    candidates = [c for theta_list in per_theta_results for c in theta_list]
+    all_candidates = [c for sublist in per_theta_results for c in sublist]
 
-    # Keep only the candidate with fewest atoms for each theta
+    # Keep only the smallest-atom candidate per twist angle
     best_per_theta = {}
-    for c in candidates:
-        theta_key = c["theta"]
-        if (theta_key not in best_per_theta or
-                c["total_atoms"] < best_per_theta[theta_key]["total_atoms"]):
-            best_per_theta[theta_key] = c
+    for c in all_candidates:
+        tk = c["theta"]
+        if tk not in best_per_theta or c["total_atoms"] < best_per_theta[tk]["total_atoms"]:
+            best_per_theta[tk] = c
     candidates = list(best_per_theta.values())
 
     if len(candidates) == 0:
-        print(f"No candidates found with <= {MAX_ATOMS} atoms. Try relaxing the parameters.")
+        print(f"No candidates found with <= {MAX_ATOMS} atoms. Try relaxing MAX_STRAIN or MAX_ATOMS.")
         exit(0)
 
-    candidates.sort(key=lambda c: (c["theta"], c["total_atoms"]))
+    # Sort by strain (ascending) — matches results.dat convention from CellMatch
+    candidates.sort(key=lambda c: c["strain"])
+    return candidates
 
-    chosen_indices = prompt_selection(candidates)
 
-    if len(chosen_indices) == 0:
-        print("\nNo candidates selected. Finished without writing any POSCAR.\n")
-        exit(0)
+def generate_poscars(chosen_indices, candidates, sort_elements, known_elements, working_dir):
+    """Build and write POSCARs for the chosen candidates.
+
+    Parameters
+    ----------
+    chosen_indices : list[int]  — zero-based indices into candidates
+    candidates     : list[dict]
+    sort_elements  : list or None
+    known_elements : list[str]
+    working_dir    : str
+
+    Returns
+    -------
+    output_records : list[dict]
+    """
 
     output_records = []
     written_count  = 0
 
-    for index in chosen_indices:
-        candidate      = candidates[index]
-        theta          = candidate["theta"]
-        lattice_matrix = candidate["bilayer_lattice_matrix"]
-        total_atoms    = candidate["total_atoms"]
-        ratio1         = candidate["area_ratio_bottom"]
-        ratio2         = candidate["area_ratio_top"]
-        strain         = candidate["strain"] * 100.0
-        n_bottom       = candidate["n_bottom"]
-        selective_dynamics  = candidate["selective_dynamics"]
+    for list_no, index in enumerate(chosen_indices, start=1):
+        candidate          = candidates[index]
+        theta              = candidate["theta"]
+        lattice_matrix     = candidate["bilayer_lattice_matrix"]
+        total_atoms        = candidate["total_atoms"]
+        ratio1             = candidate["area_ratio_bottom"]
+        ratio2             = candidate["area_ratio_top"]
+        strain             = candidate["strain"] * 100.0
+        n_bottom           = candidate["n_bottom"]
+        selective_dynamics = candidate["selective_dynamics"]
+
         elements_order, atom_counts = collect_elements_and_counts(
             candidate["bilayer_species"],
             sort_elements if sort_elements is not None else list(dict.fromkeys(known_elements))
@@ -1241,29 +1274,30 @@ def main():
         lattice_type = get_2d_lattice_type(lattice_matrix)
         shifts       = get_shift_grid(lattice_type)
 
-        base_dir = os.path.join(working_dir, f"{index + 1}_TWIST_{theta:.1f}_{total_atoms}")
+        base_dir = os.path.join(working_dir,
+                                f"{list_no}_twist_{theta:.4f}deg_{total_atoms}atoms")
         os.makedirs(base_dir, exist_ok=True)
 
-        print(f"\n  theta = {theta:.1f} deg | {total_atoms} atoms"
-              f" | ratio1 = {ratio1}  ratio2 = {ratio2} | strain = {strain:.4f}%"
-              f" | lattice type = {lattice_type}")
+        print(f"\n  [No.{index + 1}] theta = {theta:.4f} deg | {total_atoms} atoms"
+              f" | ratio1 = {ratio1}  ratio2 = {ratio2}"
+              f" | strain = {strain:.4f}% | lattice = {lattice_type}")
 
         for i, (shift_a, shift_b, stack_label) in enumerate(shifts, start=1):
 
             # Apply stacking shift to top-layer atoms BEFORE mapping_elements.
-            # n_bottom correctly splits bottom/top in the raw bilayer positions
-            # (layer1 species then layer2 species, contiguous by layer).
-            # After mapping_elements atoms are grouped by element, so n_bottom
+            # n_bottom correctly identifies the boundary between bottom and top
+            # atoms in the raw (layer-ordered) bilayer_positions array.
+            # After mapping_elements, atoms are grouped by element, so n_bottom
             # would no longer identify the top layer correctly.
-            raw_positions_direct = candidate["bilayer_positions_direct"].copy()
-            raw_positions_direct[n_bottom:, 0] = (raw_positions_direct[n_bottom:, 0] + shift_a) % 1.0
-            raw_positions_direct[n_bottom:, 1] = (raw_positions_direct[n_bottom:, 1] + shift_b) % 1.0
+            raw_positions = candidate["bilayer_positions"].copy()
+            raw_positions[n_bottom:, 0] = (raw_positions[n_bottom:, 0] + shift_a) % 1.0
+            raw_positions[n_bottom:, 1] = (raw_positions[n_bottom:, 1] + shift_b) % 1.0
 
-            raw_positions_cartesian = direct_to_cartesian(lattice_matrix, raw_positions_direct)
+            raw_cartesian = direct_to_cartesian(lattice_matrix, raw_positions)
 
-            # Now apply canonical element ordering
-            mapping = mapping_elements(elements_order, atom_counts, raw_positions_cartesian, raw_positions_direct,
-                                       candidate["bilayer_species"], selective_dynamics, candidate["bilayer_flags"], sort_elements)
+            mapping = mapping_elements(elements_order, atom_counts, raw_cartesian, raw_positions,
+                                       candidate["bilayer_species"], selective_dynamics, candidate["bilayer_flags"],
+                                       sort_elements)
 
             labels = define_labels(mapping["elements"], mapping["atom_counts"])
 
@@ -1275,26 +1309,132 @@ def main():
                          mapping["positions_direct"], selective_dynamics, mapping["flags"], labels)
 
             rel_path = os.path.relpath(output_path, working_dir)
-            output_records.append({"path":          rel_path,
-                                   "theta":         theta,
-                                   "total_atoms":   total_atoms,
-                                   "stack":         stack_label,
-                                   "strain":        strain,
-                                   "cell_mismatch": candidate["cell_mismatch"],
-                                   "indices1":      candidate["indices1"],
-                                   "indices2":      candidate["indices2"]})
+            output_records.append({"path":        rel_path,
+                                   "theta":       theta,
+                                   "total_atoms": total_atoms,
+                                   "stack":       stack_label,
+                                   "strain":      strain,
+                                   "indices1":    candidate["indices1"],
+                                   "indices2":    candidate["indices2"]})
 
-            print(f"    Written: {rel_path}")
-            print(f"(stacking = {stack_label}, shift = ({shift_a:.4f}, {shift_b:.4f}))")
+            print(f"    Written: {rel_path}  (stacking = {stack_label},"
+                  f" shift = ({shift_a:.4f}, {shift_b:.4f}))")
             written_count += 1
 
-    # Write summary list of all output files
-    twist_list      = "TWIST_LIST.dat"
-    twist_list_path = os.path.join(working_dir, twist_list)
+    return output_records
+
+
+def match_mode(bottom_file, top_file):
+    """'match' mode: search all twist angles and write TWIST_LIST.dat."""
+
+    working_dir = os.getcwd()
+    bottom = read_POSCAR(bottom_file)
+    top    = read_POSCAR(top_file) if top_file != bottom_file else bottom
+    is_hetero = (top_file != bottom_file)
+
+    if is_hetero:
+        print(f"\nHeterobilayer match: {bottom_file}  +  {top_file}")
+    else:
+        print(f"\nHomobilayer match: {bottom_file}")
+
+    bilayer_elements = bottom["elements"] + top["elements"]
+    sort_elements    = check_elements(bilayer_elements)
+    known_elements   = sort_elements if sort_elements is not None else bilayer_elements
+
+    candidates = run_search(bottom, top, sort_elements, known_elements)
+
+    display_candidates(candidates)
+
+    match_list_path = os.path.join(working_dir, TWIST_LIST_FILE)
+    write_twist_list(match_list_path, candidates, bottom_file, top_file)
+
+    print(f"\nFound {len(candidates)} candidate(s). Results written to {TWIST_LIST_FILE}")
+    print("Run 'vaspTwist.py generate' with the same input files to create POSCARs.\n")
+
+
+def generate_mode(bottom_file, top_file):
+    """'generate' mode: read TWIST_LIST.dat, prompt for selection, write POSCARs."""
+
+    working_dir     = os.getcwd()
+    match_list_path = os.path.join(working_dir, TWIST_LIST_FILE)
+
+    # Verify TWIST_LIST.dat exists
+    if not os.path.exists(match_list_path):
+        print(f"\nERROR! {TWIST_LIST_FILE} not found in {working_dir}.")
+        print("Run 'vaspTwist.py match' first to generate it.\n")
+        exit(1)
+
+    # Verify input files match what was used during match mode
+    saved_bottom, saved_top = read_twist_list_header(match_list_path)
+    if saved_bottom is None or saved_top is None:
+        print(f"\nERROR! {TWIST_LIST_FILE} has no valid header. Please re-run match mode.\n")
+        exit(1)
+
+    if os.path.abspath(bottom_file) != os.path.abspath(saved_bottom) or \
+       os.path.abspath(top_file)    != os.path.abspath(saved_top):
+        print(f"\nWARNING! Input files do not match those recorded in {TWIST_LIST_FILE}.")
+        print(f"  Recorded bottom : {saved_bottom}")
+        print(f"  Provided bottom : {bottom_file}")
+        print(f"  Recorded top    : {saved_top}")
+        print(f"  Provided top    : {top_file}")
+        print("Please re-run 'vaspTwist.py match' with the correct input files, or")
+        print("use the same files that were used during match mode.\n")
+        exit(1)
+
+    # Re-run the search to reconstruct candidates in memory
+    # (TWIST_LIST.dat stores display info; full candidate dicts are needed for POSCAR building)
+    bottom = read_POSCAR(bottom_file)
+    top    = read_POSCAR(top_file) if top_file != bottom_file else bottom
+    is_hetero = (top_file != bottom_file)
+
+    if is_hetero:
+        print(f"\nHeterobilayer generate: {bottom_file}  +  {top_file}")
+    else:
+        print(f"\nHomobilayer generate: {bottom_file}")
+
+    bilayer_elements = bottom["elements"] + top["elements"]
+    sort_elements    = check_elements(bilayer_elements)
+    known_elements   = sort_elements if sort_elements is not None else bilayer_elements
+
+    candidates = run_search(bottom, top, sort_elements, known_elements)
+
+    display_candidates(candidates)
+    chosen_indices = prompt_selection(candidates)
+
+    if len(chosen_indices) == 0:
+        print("\nNo candidates selected. Finished without writing any POSCAR.\n")
+        exit(0)
+
+    output_records = generate_poscars(chosen_indices, candidates, sort_elements, known_elements, working_dir)
+
+    twist_list_path = os.path.join(working_dir, TWIST_LIST_FILE)
     write_output_list(twist_list_path, output_records)
 
-    print(f"\nFinished! Written {written_count} POSCAR(s).")
-    print(f"Output list written to {twist_list}\n")
+    print(f"\nFinished! Written {len(output_records)} POSCAR(s).")
+    print(f"Output list written to {TWIST_LIST_FILE}\n")
+
+
+def main():
+    """Dispatch to match or generate mode based on first argument."""
+
+    if '-h' in argv or '--help' in argv:
+        usage()
+
+    # Expected: vaspTwist.py <mode> <bottom> [top]
+    if len(argv) not in (3, 4):
+        usage()
+
+    mode        = argv[1].lower()
+    bottom_file = argv[2]
+    top_file    = argv[3] if len(argv) == 4 else argv[2]
+
+    if mode == "match":
+        match_mode(bottom_file, top_file)
+    elif mode == "generate":
+        generate_mode(bottom_file, top_file)
+    else:
+        print(f"\nERROR! Unknown mode '{argv[1]}'. Use 'match' or 'generate'.\n")
+        usage()
 
 
 if __name__ == "__main__":
