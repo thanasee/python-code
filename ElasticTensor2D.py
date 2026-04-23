@@ -26,8 +26,8 @@ This script was developed by Thanasee Thanasarnsurapong.
 
 ANGSTROM = 1e-10
 ALL_STRAIN = ['C11', 'C22', 'C11_C22_2C12', 'C66']
-STRAIN_RANGE = np.linspace(-0.05, 0.05, 11)
-ZERO_STRAIN_IDX = 5
+STRAIN_RANGE = np.linspace(-0.02, 0.02, 9)
+ZERO_STRAIN_IDX = len(STRAIN_RANGE) // 2
 
 
 def read_POSCAR(filepath):
