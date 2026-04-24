@@ -2,7 +2,7 @@
 
 A collection of Python scripts for VASP output analysis and related tasks, developed for computational materials science research on the LANTA HPC cluster.
 
-**Author:** Thanasee Thanasarnsurapong
+**Author:** [Thanasee Thanasarnsurapong](https://scholar.google.com/citations?user=4KHXv9gAAAAJ&hl=en)
 
 ---
 
@@ -385,4 +385,4 @@ All scripts follow the same conventions modeled on `vaspSupercell.py`:
 
 ## License
 
-Developed by Thanasee Thanasarnsurapong. For research and academic use.
+Developed by [Thanasee Thanasarnsurapong](https://scholar.google.com/citations?user=4KHXv9gAAAAJ&hl=en). For research and academic use.
