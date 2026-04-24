@@ -444,8 +444,8 @@ def rotation_matrix(degree):
     """
 
     radian = np.radians(degree)
-    sin = np.sin(radian)
-    cos = np.cos(radian)
+    sin = np.sin(-radian)
+    cos = np.cos(-radian)
     u = np.array([0., 0., 1.])
 
     rotate = cos * np.eye(3) + sin * np.cross(np.eye(3), u) + (1 - cos) * np.outer(u, u)
@@ -519,10 +519,7 @@ def find_moire_vectors(bottom_lattice_matrix, top_lattice_matrix,
     moire_vectors : list of tuples (theta, n1, n2, m1, m2, rel_distance, v_layer1, v_layer2)
     """
 
-    theta_array = np.arange(theta_min, theta_max, theta_step)
-
-    # Full range -n_max to n_max including 0, so (1,0) and (0,1) are always included.
-    # Zero-vector (0,0) is rejected inside find_moire_vectors_chunk by the norm_v == 0 check.
+    theta_array = np.arange(theta_min, theta_max + theta_step / 2, theta_step)
     combined_list = np.arange(-n_max, n_max + 1)
 
     num_cores = mp.cpu_count()
@@ -820,7 +817,7 @@ def find_candidates(theta_key, vec_list, bottom_lattice_matrix, bottom_species,
     prim_cross_top    = b1[0] * b2[1] - b1[1] * b2[0]
  
     # Sort by rel_dist only — CellMatch convention.
-    vec_list = sorted(vec_list, key=lambda x: x[0])
+    vec_list = sorted(vec_list, key=lambda x: (x[0], abs(x[3]) + abs(x[4])))
  
     theta_candidates = []
     seen_configurations = set()
@@ -866,19 +863,19 @@ def find_candidates(theta_key, vec_list, bottom_lattice_matrix, bottom_species,
             A2_common = (A2_bottom + A2_top) / 2.0
  
             theta_candidates.append({"theta":                  theta_key,
-                                      "A1_bottom":              A1_bottom,
-                                      "A2_bottom":              A2_bottom,
-                                      "A1_top":                 A1_top,
-                                      "A2_top":                 A2_top,
-                                      "A1_vec":                 A1_vec,
-                                      "A2_vec":                 A2_vec,
-                                      "strain":                 lagrangian_strain,
-                                      "area_ratio_bottom":      omjer1,
-                                      "area_ratio_top":         omjer2,
-                                      "indices1":               (n1_i, n2_i, n1_j, n2_j),
-                                      "indices2":               (m1_i, m2_i, m1_j, m2_j),
-                                      "bilayer_lattice_matrix": np.array([A1_common, A2_common, a3]),
-                                      "total_atoms":            total_atoms_bilayer})
+                                     "A1_bottom":              A1_bottom,
+                                     "A2_bottom":              A2_bottom,
+                                     "A1_top":                 A1_top,
+                                     "A2_top":                 A2_top,
+                                     "A1_vec":                 A1_vec,
+                                     "A2_vec":                 A2_vec,
+                                     "strain":                 lagrangian_strain,
+                                     "area_ratio_bottom":      omjer1,
+                                     "area_ratio_top":         omjer2,
+                                     "indices1":               (n1_i, n2_i, n1_j, n2_j),
+                                     "indices2":               (m1_i, m2_i, m1_j, m2_j),
+                                     "bilayer_lattice_matrix": np.array([A1_common, A2_common, a3]),
+                                     "total_atoms":            total_atoms_bilayer})
  
     return theta_candidates
 
@@ -925,7 +922,7 @@ def build_bilayer_for_candidate(candidate, bottom_lattice_matrix, bottom_positio
     A1_vec    = candidate["A1_vec"]
     A2_vec    = candidate["A2_vec"]
  
-    rotated_top_lattice = np.dot(top_lattice_matrix, rotation_matrix(theta_key).T)
+    rotated_top_lattice = top_lattice_matrix @ rotation_matrix(theta_key).T
     selective_dynamics  = bottom_selective_dynamics or top_selective_dynamics
  
     layer1 = build_supercell(bottom_lattice_matrix, bottom_positions_cartesian,
@@ -934,7 +931,7 @@ def build_bilayer_for_candidate(candidate, bottom_lattice_matrix, bottom_positio
  
     # Rotation applied to both lattice and positions — same rotated frame
     rot = rotation_matrix(theta_key)
-    top_positions_rotated = np.dot(top_positions_cartesian, rot.T)
+    top_positions_rotated = top_positions_cartesian @ rot.T
     layer2_rotated = build_supercell(rotated_top_lattice, top_positions_rotated,
                                      top_species, top_selective_dynamics, top_flags,
                                      A1_vec, A2_vec)
@@ -1195,7 +1192,7 @@ def read_twist_list(filepath, bottom_lattice_matrix, top_lattice_matrix):
  
             # Reconstruct supercell vectors from indices + POSCAR lattice
             rot             = rotation_matrix(theta)
-            rotated_top_lat = np.dot(top_lattice_matrix, rot.T)
+            rotated_top_lat = top_lattice_matrix @ rot.T
  
             A1_bottom = n1  * a1 + n2  * a2
             A2_bottom = n1p * a1 + n2p * a2
@@ -1221,6 +1218,98 @@ def read_twist_list(filepath, bottom_lattice_matrix, top_lattice_matrix):
                                "total_atoms":            total_atoms})
  
     return candidates
+
+
+def filter_unique_per_theta(candidates):
+    """Apply CellMatch uniqueness filter independently for each twist angle.
+ 
+    Mirrors match_cells.py post-processing exactly, applied per-theta
+    (CellMatch runs at a fixed angle; we loop over all thetas):
+ 
+        1. Sort candidates by strain (ascending) within each theta.
+        2. Deduplicate: two candidates are considered identical if
+               |strain_i - strain_j| < 1e-4  AND
+               |omjer1_i/omjer2_i - omjer1_j/omjer2_j| < 1e-5
+           Among duplicates, keep the one with the smallest
+               length = |A1| * |A2|   (match_cells.py: sqrt(|A1|²)*sqrt(|A2|²))
+        3. From the deduplicated list write only candidates whose
+           total_atoms is strictly less than the previous written candidate
+           (match_cells.py: writeout=0 if natoms >= last_number_of_atoms).
+ 
+    Parameters
+    ----------
+    candidates : list[dict]  — all candidates from find_candidates across all thetas
+ 
+    Returns
+    -------
+    filtered : list[dict]
+    """
+ 
+    TOLERANCE_STRAIN = 1e-4
+    TOLERANCE_RATIO  = 1e-5
+ 
+    # Group by theta
+    by_theta = {}
+    for c in candidates:
+        by_theta.setdefault(c["theta"], []).append(c)
+ 
+    filtered = []
+ 
+    for theta_key, theta_cands in by_theta.items():
+ 
+        # Step 1: sort by strain
+        theta_cands.sort(key=lambda c: c["strain"])
+ 
+        # Step 2: deduplicate by (strain, omjer ratio), keep smallest length
+        unique_strain = []   # [(strain, omjer1, omjer2, length)]  — for comparison
+        unique_cands  = []   # surviving candidate dicts
+ 
+        for idx, c in enumerate(theta_cands):
+            strain  = c["strain"]
+            omjer1  = c["area_ratio_bottom"]
+            omjer2  = c["area_ratio_top"]
+            length  = np.linalg.norm(c["A1_vec"]) * np.linalg.norm(c["A2_vec"])
+            ratio   = omjer1 / omjer2 if omjer2 != 0 else float("inf")
+ 
+            duplicate_idx = None
+            for k, (s_in, r_in, l_in) in enumerate(unique_strain):
+                if (abs(strain - s_in) < TOLERANCE_STRAIN and
+                        abs(ratio  - r_in) < TOLERANCE_RATIO):
+                    duplicate_idx = k
+                    break
+ 
+            if duplicate_idx is None:
+                # New unique entry — find the representative with smallest length
+                # by scanning ahead for same strain+ratio (match_cells.py lookahead)
+                best_idx  = idx
+                best_len  = length
+                for idx2, c2 in enumerate(theta_cands[idx + 1:], start=idx + 1):
+                    s2  = c2["strain"]
+                    r2  = (c2["area_ratio_bottom"] / c2["area_ratio_top"]
+                           if c2["area_ratio_top"] != 0 else float("inf"))
+                    l2  = np.linalg.norm(c2["A1_vec"]) * np.linalg.norm(c2["A2_vec"])
+                    if s2 > strain + TOLERANCE_STRAIN:
+                        break
+                    if abs(s2 - strain) < TOLERANCE_STRAIN and abs(r2 - ratio) < TOLERANCE_RATIO:
+                        if l2 < best_len:
+                            best_len = l2
+                            best_idx = idx2
+                unique_strain.append((strain, ratio, best_len))
+                unique_cands.append(theta_cands[best_idx])
+            else:
+                # Duplicate — replace if this one has smaller length
+                if length < unique_strain[duplicate_idx][2]:
+                    unique_strain[duplicate_idx] = (strain, ratio, length)
+                    unique_cands[duplicate_idx]  = c
+ 
+        # Step 3: write only if total_atoms strictly decreases
+        last_atoms = -1
+        for c in unique_cands:
+            if last_atoms == -1 or c["total_atoms"] < last_atoms:
+                filtered.append(c)
+                last_atoms = c["total_atoms"]
+ 
+    return filtered
 
 
 def run_search(bottom, top, sort_elements, known_elements):
@@ -1276,23 +1365,16 @@ def run_search(bottom, top, sort_elements, known_elements):
               top["lattice_matrix"],   top["species"])
              for theta_key, vec_list in vectors_by_theta.items()]
         )
- 
-    all_candidates = [c for sublist in per_theta_results for c in sublist]
- 
-    # Keep only the smallest-atom candidate per twist angle
-    best_per_theta = {}
-    for c in all_candidates:
-        tk = c["theta"]
-        if tk not in best_per_theta or c["total_atoms"] < best_per_theta[tk]["total_atoms"]:
-            best_per_theta[tk] = c
-    candidates = list(best_per_theta.values())
+
+    candidates = [c for sublist in per_theta_results for c in sublist]
  
     if len(candidates) == 0:
         print(f"No candidates found with <= {MAX_ATOMS} atoms. Try relaxing MAX_STRAIN or MAX_ATOMS.")
         exit(0)
  
-    # Sort by strain (ascending) — matches results.dat convention from CellMatch
-    candidates.sort(key=lambda c: c["strain"])
+    # Apply CellMatch uniqueness filter per theta, then sort by (theta, strain)
+    candidates = filter_unique_per_theta(candidates)
+    candidates.sort(key=lambda c: (c["theta"], c["strain"]))
     return candidates
 
 
