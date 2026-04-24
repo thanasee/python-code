@@ -55,7 +55,7 @@ Automatically scans for all `kappa-m*.hdf5` files, sorts them by mesh number, an
 Extracts mode-resolved thermal transport properties from a single Phono3py `kappa-mXXX.hdf5` file and writes per-temperature output files suitable for plotting in xmgrace or matplotlib.
 
 ```
-Usage: analyzePhono3py.py <kappa HDF5 file> [temperature index]
+Usage: analyzePhono3py.py <kappa HDF5 file> <gruneisen HDF5 file (optional)>
 ```
 
 **Output files (per temperature):**
@@ -73,7 +73,7 @@ Usage: analyzePhono3py.py <kappa HDF5 file> [temperature index]
 Compares interatomic force constants (IFCs) between DFT and MLFF calculations by reading Phono3py HDF5 files and writing the residual (MLFF − DFT) to `.dat` files. Auto-detects whether the file contains 2nd-order (`force_constants`) or 3rd-order (`fc3`) IFCs.
 
 ```
-Usage: compareIFCs.py <DFT HDF5 input> <MLFF HDF5 input>
+Usage: compareIFCs.py <DFT's force constants HDF5 input> <MLFF's force constants HDF5 input>
 ```
 
 **Output files:**
@@ -93,7 +93,7 @@ Scripts that read VASP POSCAR/CONTCAR structure files and compute structural pro
 Extracts vibrational normal modes from a VASP `OUTCAR` or Phonopy `YAML` file and writes each mode as an XSF file for visualization in VESTA or XCrySDen.
 
 ```
-Usage: vaspVibration.py <structure file> <OUTCAR or phonopy YAML>
+Usage: vaspVibration.py <structure file> <OUTCAR or phonopy YAML> [scaling factor]
 ```
 
 - VASP OUTCAR: modes written in descending frequency order (VASP convention)
@@ -210,7 +210,7 @@ Accepts 3 values (diagonal strain) or 9 values (full 3×3 tensor). Off-diagonal 
 Generates bilayer and heterostructure POSCAR files from one or two input POSCAR files by stacking along the c-axis.
 
 ```
-Usage: vaspStack.py <POSCAR> [POSCAR2] <output prefix>
+Usage: vaspStack.py <POSCAR> [POSCAR2]
 ```
 
 Features: lattice compatibility checking (`check_lattice`), 2D Bravais lattice type detection, high-symmetry stacking shift grids per lattice type, mirror-flip of the second layer, and a summary `output_list.txt` of all generated POSCARs.
@@ -219,13 +219,18 @@ Features: lattice compatibility checking (`check_lattice`), 2D Bravais lattice t
 
 #### `vaspTwist.py`
 
-Generates moiré twisted bilayer POSCAR files by searching for commensurate supercells at target twist angles.
+Generates moiré twisted bilayer POSCAR files by searching for commensurate supercells across twist angles. The workflow is split into two modes run sequentially.
 
 ```
-Usage: vaspTwist.py <bottom POSCAR> [top POSCAR]
+Usage: vaspTwist.py match    <bottom POSCAR> [top POSCAR]   # Step 1: search & write TWIST_LIST.dat
+       vaspTwist.py generate <bottom POSCAR> [top POSCAR]   # Step 2: read TWIST_LIST.dat & write POSCARs
 ```
 
-Key parameters: `MAX_ATOMS = 200` (hard cap on supercell size); `N_MAX` derived as `ceil(sqrt(MAX_ATOMS / primitive_atoms))`; `THETA_STEP = 0.1°` (suitable for angles above ~2°). Supports heterobilayer inputs (two different POSCARs). Uses the CellMatch symmetric relative distance metric for lattice matching. Lattice-type detection and high-symmetry stacking shift grids are implemented for hexagonal, square, rectangular, and oblique supercells. An interactive post-search selection prompt allows generating all, selected, or no output POSCARs. Writes a `output_list.txt` summary of all generated files.
+**`match` mode:** Searches twist angles from 0° to 180° (step: 0.1°) for commensurate supercell pairs using the CellMatch symmetric relative distance metric. Results are written to `TWIST_LIST.dat`, sorted by (θ, strain). No POSCAR is written at this stage.
+
+**`generate` mode:** Reads `TWIST_LIST.dat`, displays the candidate table interactively, and writes one POSCAR per selected stacking configuration. The post-search prompt accepts individual indices, `'all'`, or `'none'`.
+
+Providing a single POSCAR uses it for both layers (homobilayer). Providing two different POSCARs enables heterobilayer mode. Key parameters: `MAX_ATOMS = 200` (hard cap on total supercell atoms); `N_MAX` derived as `ceil(sqrt(MAX_ATOMS / primitive_atoms))`; `THETA_STEP = 0.1°` (suitable for angles above ~2°; use `0.01°` for magic-angle regimes below ~2°). Lattice-type detection and high-symmetry stacking shift grids are implemented for hexagonal, square, rectangular, and oblique supercells.
 
 ---
 
