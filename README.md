@@ -77,8 +77,8 @@ Usage: compareIFCs.py <DFT's force constants HDF5 input> <MLFF's force constants
 ```
 
 **Output files:**
-- `2ndIFCs.dat` — 2nd-order IFC comparison in eV/Å²
-- `3rdIFCs.dat` — 3rd-order IFC comparison in eV/Å³
+- `2ndIFCs.dat` — 2nd-order IFC comparison in eV/Å^2
+- `3rdIFCs.dat` — 3rd-order IFC comparison in eV/Å^3
 
 ---
 
@@ -127,7 +127,7 @@ Usage: vaspMechanics.py <POSCAR> <OUTCAR>
 - Computes Voigt, Reuss, and Hill (VRH) averages for bulk and shear moduli
 - Derives Young's modulus, Poisson's ratio, P-wave modulus, Lamé parameter, Pugh's ratio
 - Computes sound velocities (transverse, longitudinal, mean) and Debye temperature
-- Computes anisotropy indices: universal (Aᵤ), bulk (A_B), shear (A_G), and planar (A₁, A₂, A₃)
+- Computes anisotropy indices: universal (A_U), bulk (A_B), shear (A_G), and planar (A_1, A_2, A_3)
 - **Output:** `Elastic.dat`, `Mechanics.dat`, `Anisotropy.dat`
 
 ---
@@ -143,7 +143,7 @@ Usage: ElasticTensor2D.py pre  <structure file>   # Generate strained POSCARs
 
 **`pre` mode:** Applies a set of strain tensors to the input structure and writes strained POSCAR files to individual directories. Detects crystal system (oblique vs. non-oblique) and applies the appropriate strain set.
 
-**`post` mode:** Reads total energies from each strain directory's `OUTCAR`, fits energy vs. strain to a quadratic, extracts elastic constants (C₁₁, C₂₂, C₁₂, C₆₆, and C₁₆/C₂₆ for oblique), checks mechanical stability via eigenvalue positivity, and computes angle-dependent mechanical properties.
+**`post` mode:** Reads total energies from each strain directory's `OUTCAR`, fits energy vs. strain to a quadratic, extracts elastic constants (C11, C22, C12, C66, and C16/C26 for oblique), checks mechanical stability via eigenvalue positivity, and computes angle-dependent mechanical properties.
 
 **Output:** `Elastic.dat`, `Young.dat`, `Poisson.dat`, `Shear.dat`
 
@@ -151,7 +151,7 @@ Usage: ElasticTensor2D.py pre  <structure file>   # Generate strained POSCARs
 
 #### `vaspPiezoelectric.py`
 
-Extracts the piezoelectric stress tensor (e, C/m²) and elastic stiffness tensor (C, GPa or N/m) from a VASP `OUTCAR` and computes the piezoelectric strain tensor (d = e · S, pm/V) via the compliance tensor S = C⁻¹.
+Extracts the piezoelectric stress tensor (e, C/m^2) and elastic stiffness tensor (C, GPa or N/m) from a VASP `OUTCAR` and computes the piezoelectric strain tensor (d = e · S, pm/V) via the compliance tensor S = inverse(C).
 
 ```
 Usage: vaspPiezoelectric.py <OUTCAR>
@@ -332,7 +332,7 @@ Usage: mlError.py <ML_LOGFILE>
 
 #### `mlRegression.py`
 
-Evaluates MLFF accuracy against DFT reference data from the VASP `ML_REG` file, computing RMSE, MAE, and R² for energies (meV/atom), forces (eV/Å), and stresses (kbar).
+Evaluates MLFF accuracy against DFT reference data from the VASP `ML_REG` file, computing RMSE, MAE, and R-square for energies (meV/atom), forces (eV/Å), and stresses (kbar).
 
 ```
 Usage: mlRegression.py <ML_REG>
@@ -350,7 +350,7 @@ Converts VASP's `ML_AB` binary training data file to extended XYZ (`.extxyz`) fo
 Usage: mlab2extxyz.py <ML_AB input> <output.extxyz>
 ```
 
-Each configuration block is mapped to one extxyz frame with lattice, positions, energy, forces, and stress. Stress is converted from kbar to eV/Å³.
+Each configuration block is mapped to one extxyz frame with lattice, positions, energy, forces, and stress. Stress is converted from kbar to eV/Å^3.
 
 ---
 
