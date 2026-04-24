@@ -213,7 +213,7 @@ Generates bilayer and heterostructure POSCAR files from one or two input POSCAR 
 Usage: vaspStack.py <POSCAR> [POSCAR2]
 ```
 
-Features: lattice compatibility checking (`check_lattice`), 2D Bravais lattice type detection, high-symmetry stacking shift grids per lattice type, mirror-flip of the second layer, and a summary `output_list.txt` of all generated POSCARs.
+Features: lattice compatibility checking (`check_lattice`), 2D Bravais lattice type detection, high-symmetry stacking shift grids per lattice type, mirror-flip of the second layer, and a summary `STACK_LIST.txt` of all generated POSCARs.
 
 ---
 
