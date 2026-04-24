@@ -218,6 +218,7 @@ Features: lattice compatibility checking (`check_lattice`), 2D Bravais lattice t
 ---
 
 #### `vaspTwist.py`
+**Inspired by:** [CellMatch](https://doi.org/10.1016/j.cpc.2015.08.038)
 
 Generates moiré twisted bilayer POSCAR files by searching for commensurate supercells across twist angles. The workflow is split into two modes run sequentially.
 
@@ -343,6 +344,7 @@ Usage: mlRegression.py <ML_REG>
 ---
 
 #### `mlab2extxyz.py`
+**Inspired by:** [utf/pymlff](https://github.com/utf/pymlff)
 
 Converts VASP's `ML_AB` binary training data file to extended XYZ (`.extxyz`) format for use with external MLFF training frameworks such as MACE, NequIP, and GPUMD.
 
@@ -355,6 +357,7 @@ Each configuration block is mapped to one extxyz frame with lattice, positions, 
 ---
 
 #### `mergeMLAB.py`
+**Inspired by:** [utf/pymlff](https://github.com/utf/pymlff)
 
 Merges multiple VASP `ML_AB` training data files into a single unified file, unifying element lists, basis sets, and renumbering configurations.
 
