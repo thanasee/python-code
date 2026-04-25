@@ -23,9 +23,9 @@ All scripts are standalone CLI tools written in Python using NumPy as the primar
 
 - Python 3.8+
 - NumPy
-- h5py (for Phono3py HDF5 scripts)
-- matplotlib (for plotting scripts)
-- ASE — Atomic Simulation Environment (for `vaspMechanics.py` 3D mode)
+- h5py
+- matplotlib
+- ASE — Atomic Simulation Environment
 - Phonopy/Phono3py (as data source; not imported directly)
 
 ---
@@ -52,19 +52,32 @@ Automatically scans for all `kappa-m*.hdf5` files, sorts them by mesh number, an
 
 #### `analyzePhono3py.py`
 
-Extracts mode-resolved thermal transport properties from a single Phono3py `kappa-mXXX.hdf5` file and writes per-temperature output files suitable for plotting in xmgrace or matplotlib.
+Extracts mode-resolved thermal transport properties from a single Phono3py `kappa-mXXX.hdf5` file and writes output files suitable for plotting in xmgrace or matplotlib. Supports all Phono3py calculation modes (`--br`, `--lbte`, `--wigner`). If a Grüneisen HDF5 file is provided, Grüneisen parameters and group velocities are also extracted.
 
 ```
 Usage: analyzePhono3py.py <kappa HDF5 file> <gruneisen HDF5 file (optional)>
 ```
 
-**Output files (per temperature):**
-- Mode κ vs. frequency
-- Mode κ vs. mean free path
-- Cumulative κ vs. frequency
-- Derivative of cumulative κ vs. frequency
-- Cumulative κ vs. mean free path
-- Derivative of cumulative κ vs. mean free path
+Output filenames follow the pattern `<tag>-mXXXXXX.dat`, where the mesh token is preserved from the input filename. All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/m-K.
+
+**Temperature-dependent files** (one value per temperature row, written to the working directory):
+- `KappaVsT` — total κ tensor vs. temperature
+- `Kappa_bandVsT` — κ tensor decomposed into 3 acoustic branches + 1 summed optical branch vs. temperature
+- `ContributeKappaVsT` — per-mode percentage contribution to total κ vs. temperature
+- `Tau_CRTAVsT` — phonon lifetime (CRTA) vs. temperature *(if available)*
+- Equivalent files for RTA, Wigner-C, Wigner-P (RTA), and Wigner-P (exact) variants *(if available)*
+
+**Per-temperature spectral files** (one file per temperature, written to subdirectories `T{value}K/`):
+- `KappaVsFrequency` — mode κ vs. phonon frequency (THz)
+- `KappaVsMfp` — mode κ vs. mean free path (Å)
+- `cumulative_KappaVsFrequency` — cumulative κ sorted by ascending frequency
+- `derivative_KappaVsFrequency` — spectral κ density d(κ)/d(frequency)
+- `cumulative_KappaVsMfp` — cumulative κ sorted by ascending mean free path
+- `derivative_KappaVsMfp` — spectral κ density d(κ)/d(MFP)
+
+**Grüneisen / group velocity files** *(written only when the Grüneisen HDF5 is provided)*:
+- `GvVsFrequency` — group velocity magnitude vs. frequency
+- `Gamma_isotopeVsFrequency` — isotope scattering rate vs. frequency *(if available)*
 
 ---
 
