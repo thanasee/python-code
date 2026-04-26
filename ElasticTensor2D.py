@@ -309,7 +309,7 @@ def mapping_elements(elements, atom_counts, positions_cartesian, positions_direc
 
     return {"elements":           new_elements,
             "atom_counts":        new_atom_counts,
-            "positions_cartesian": new_positions_cartesian,
+            "positions_cartesian":new_positions_cartesian,
             "positions_direct":   new_positions_direct,
             "species":            new_species,
             "flags":              new_flags if selective_dynamics else None}
@@ -332,8 +332,7 @@ def define_labels(elements, atom_counts):
     """
 
     digits = len(str(max(atom_counts))) + 1
-    labels = [f"{symbol}{str(counter).zfill(digits)}"
-              for symbol, number in zip(elements, atom_counts)
+    labels = [f"{symbol}{str(counter).zfill(digits)}" for symbol, number in zip(elements, atom_counts)
               for counter in range(1, number + 1)]
 
     return labels
@@ -880,7 +879,7 @@ def mode_pre(filepath):
             strain_matrix = build_strain_matrix(strain_type, strain)
             new_lattice_matrix = applying_strain(poscar["lattice_matrix"], strain_matrix)
             write_POSCAR(os.path.join(strain_path, 'POSCAR'), new_lattice_matrix, mapping["elements"],
-                         mapping["atom_counts"], poscar["positions_direct"], mapping["selective_dynamics"],
+                         mapping["atom_counts"], mapping["positions_direct"], poscar["selective_dynamics"],
                          mapping["flags"], labels)
 
     print(f"Done. Strained POSCARs written for {len(strain_types)} strain types "
