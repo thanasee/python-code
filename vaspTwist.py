@@ -444,8 +444,8 @@ def rotation_matrix(degree):
     """
 
     radian = np.radians(degree)
-    sin = np.sin(-radian)
-    cos = np.cos(-radian)
+    sin = np.sin(radian)
+    cos = np.cos(radian)
     u = np.array([0., 0., 1.])
 
     rotate = cos * np.eye(3) + sin * np.cross(np.eye(3), u) + (1 - cos) * np.outer(u, u)
