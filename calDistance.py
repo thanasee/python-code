@@ -665,7 +665,8 @@ def main():
  
     poscar = read_POSCAR(argv[1])
     mapping = mapping_elements(poscar["elements"], poscar["atom_counts"], poscar["positions_cartesian"],
-                               poscar["positions_direct"], poscar["selective_dynamics"], poscar["flags"])
+                               poscar["positions_direct"], poscar["species"],
+                               poscar["selective_dynamics"], poscar["flags"])
     labels = define_labels(mapping["elements"], mapping["atom_counts"])
     image_offsets = compute_image_offsets(poscar["lattice_matrix"])
  
