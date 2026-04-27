@@ -90,8 +90,40 @@ Usage: compareIFCs.py <DFT's force constants HDF5 input> <MLFF's force constants
 ```
 
 **Output files:**
-- `2ndIFCs.dat` — 2nd-order IFC comparison in eV/Å^2
-- `3rdIFCs.dat` — 3rd-order IFC comparison in eV/Å^3
+- `2ndIFCs.dat` — 2nd-order IFC comparison in eV/Å²
+- `3rdIFCs.dat` — 3rd-order IFC comparison in eV/Å³
+
+---
+
+#### `analyzeShengBTE.py`
+
+Extracts thermal transport properties from [ShengBTE](https://www.shengbte.org/) output files and writes them to `.dat` files suitable for plotting in xmgrace or matplotlib. FourPhonon four-phonon scattering quantities are auto-detected and extracted when present. Run from the ShengBTE output directory; no arguments are required.
+
+```
+Usage: analyzeShengBTE.py
+```
+
+Temperature subdirectories (`T-<int>K/`) are detected automatically from the working directory. If more than one temperature is found, an interactive prompt asks which temperature(s) to process. FourPhonon is detected by the presence of `BTE.w4_*` or `BTE.P4` files inside any `T-<int>K/` subdirectory.
+
+All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/(m·K).
+
+**Temperature-dependent files** (one value per temperature row, written to the working directory):
+- `kappa_tensor_RTA.dat` — total κ tensor vs. temperature (3-phonon RTA)
+- `kappa_tensor_CONV.dat` — total κ tensor vs. temperature (iterative solution, if available)
+- `kappa_tensor_4ph.dat` — total κ tensor vs. temperature (3ph+4ph RTA) *[FourPhonon only]*
+
+**Per-temperature spectral files** (written into each selected `T-<int>K/` subdirectory):
+- `kappa_mode.dat` — mode κ vs. phonon frequency (THz), 3-phonon RTA
+- `kappa_mode_4ph.dat` — mode κ vs. frequency, 3ph+4ph RTA *[FourPhonon only]*
+- `gruneisen.dat` — Grüneisen parameter vs. frequency
+- `scattering_rate_3ph.dat` — 3-phonon scattering rate Γ (ps⁻¹) vs. frequency
+- `lifetime_3ph.dat` — 3-phonon phonon lifetime τ (ps) vs. frequency
+- `scattering_rate_4ph.dat` — 4-phonon scattering rate Γ (ps⁻¹) vs. frequency *[FourPhonon only]*
+- `lifetime_4ph.dat` — 4-phonon phonon lifetime τ (ps) vs. frequency *[FourPhonon only]*
+- `phase_space_3ph.dat` — 3-phonon phase space P₃ (absorption + emission) vs. frequency; file header records the scalar totals P3\_total, P3\_plus\_total, P3\_minus\_total
+- `phase_space_4ph.dat` — 4-phonon phase space P₄ (++, +−, −−) vs. frequency; header records P4\_total and each process-type total *[FourPhonon only]*
+- `cumulative_kappa_mfp.dat` — cumulative κ vs. mean free path (nm)
+- `cumulative_kappa_freq.dat` — cumulative κ vs. phonon frequency (THz)
 
 ---
 
