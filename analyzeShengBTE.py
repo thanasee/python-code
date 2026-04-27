@@ -68,8 +68,8 @@ def detect_temperature_dirs(base_dir):
         print("       Make sure you are pointing to the ShengBTE output directory.")
         exit(1)
     return dict(sorted(dirs.items()))
-
-
+ 
+ 
 def select_temperatures(temp_dirs):
     """
     Ask the user which temperatures to process when more than one is found.
@@ -132,17 +132,21 @@ def select_temperatures(temp_dirs):
         print("  No valid selection — processing all temperatures.")
         return temp_dirs
     return result
-
-
+ 
+ 
 def detect_fourphonon(base_dir, temp_dirs):
     """
-    Return True if FourPhonon output files (BTE.w4_* or BTE.P4) are present
-    in any of the provided temperature directories.
+    Return True if FourPhonon output files are present.
+ 
+    Checks BTE.w4_* inside T-*K/ subdirectories (temperature-dependent)
+    and BTE.P4 in base_dir (temperature-independent).
  
     Parameters
     ----------
+    base_dir : str
+        ShengBTE root directory (checked for BTE.P4).
     temp_dirs : dict
-        {temperature_K (int): path (str)}.
+        {temperature_K (int): path (str)} (checked for BTE.w4_*).
  
     Returns
     -------
@@ -158,8 +162,8 @@ def detect_fourphonon(base_dir, temp_dirs):
     if os.path.isfile(os.path.join(base_dir, "BTE.P4")):
         return True
     return False
-
-
+ 
+ 
 def _load(directory, fname, label=""):
     """
     Load a whitespace-delimited ShengBTE plain-text file.
@@ -182,8 +186,8 @@ def _load(directory, fname, label=""):
         print(f"  WARNING: '{tag}' not found — skipping.")
         return None
     return np.loadtxt(path)
-
-
+ 
+ 
 def read_omega(temp_dir):
     """
     Read BTE.omega: angular frequencies (rad/ps), one per mode.
@@ -240,7 +244,8 @@ def read_scattering_rate(temp_dir, suffix):
     """
     Read 3ph phonon scattering rates (linewidths) from BTE.w_{suffix}.
  
-    Falls back to BTE.w_anharmonic when BTE.w_total is absent.
+    When suffix is 'total' and BTE.w_total is absent, falls back silently to
+    BTE.w_anharmonic and prints a single informational message.
  
     Parameters
     ----------
@@ -251,15 +256,20 @@ def read_scattering_rate(temp_dir, suffix):
     Returns
     -------
     numpy.ndarray or None
-        Shape (n_modes,), units ps⁻¹.
+        Shape (n_modes,), units ps-1.
     """
-    data = _load(temp_dir, f"BTE.w_{suffix}", f"BTE.w_{suffix}")
-    if data is None and suffix == "total":
-        data = _load(temp_dir, "BTE.w_anharmonic",
-                     "BTE.w_anharmonic (fallback for BTE.w_total)")
-    return data
+    path = os.path.join(temp_dir, f"BTE.w_{suffix}")
+    if os.path.isfile(path):
+        return np.loadtxt(path)
+    if suffix == "total":
+        fallback = os.path.join(temp_dir, "BTE.w_anharmonic")
+        if os.path.isfile(fallback):
+            print("  INFO: BTE.w_total not found — using BTE.w_anharmonic.")
+            return np.loadtxt(fallback)
+    print(f"  WARNING: 'BTE.w_{suffix}' not found — skipping.")
+    return None
  
- 
+
 def read_w4(temp_dir, suffix="total"):
     """
     Read 4ph scattering rates from BTE.w4_{suffix} (FourPhonon).
@@ -309,29 +319,29 @@ def _read_scalar(directory, fname):
         return None
  
  
-def read_phase_space_3ph(base_dir, temp_dir):
+def read_phase_space_3ph(base_dir):
     """
     Read all 3-phonon phase space data.
  
-    Per-mode arrays (shape (n_modes,)) live in temp_dir:
+    All files are temperature-independent and live in base_dir.
+ 
+    Per-mode arrays (shape (n_modes,)):
       BTE.P3, BTE.P3_plus, BTE.P3_minus
  
-    Integrated scalar totals (single value) live in base_dir:
+    Integrated scalar totals (single value):
       BTE.P3_total, BTE.P3_plus_total, BTE.P3_minus_total
  
     Parameters
     ----------
     base_dir : str
         ShengBTE root directory.
-    temp_dir : str
-        T-*K subdirectory.
  
     Returns
     -------
     dict
-        Keys: 'p3', 'p3_plus', 'p3_minus'           → ndarray or None
+        Keys: 'p3', 'p3_plus', 'p3_minus'        -> ndarray or None
               'p3_total', 'p3_plus_total',
-              'p3_minus_total'                        → float or None
+              'p3_minus_total'                      -> float or None
     """
     return {
         'p3'             : _load(base_dir, "BTE.P3",             "BTE.P3"),
@@ -342,36 +352,38 @@ def read_phase_space_3ph(base_dir, temp_dir):
         'p3_minus_total' : _read_scalar(base_dir, "BTE.P3_minus_total"),
     }
  
- 
-def read_phase_space_4ph(base_dir, temp_dir):
+    
+def read_phase_space_4ph(base_dir):
     """
     Read all 4-phonon phase space data (FourPhonon).
  
-    Per-mode arrays (shape (n_modes,)) live in temp_dir:
+    All files are temperature-independent and live in base_dir.
+ 
+    Per-mode arrays (shape (n_modes,)):
       BTE.P4, BTE.P4_plusplus, BTE.P4_plusminus, BTE.P4_minusminus
  
-    Integrated scalar totals (single value) live in base_dir:
+    Integrated scalar totals (single value):
       BTE.P4_total, BTE.P4_plusplus_total, BTE.P4_plusminus_total,
       BTE.P4_minusminus_total
  
     The three 4ph scattering channels are:
-      plusplus   (++) — recombination:    λ + λ' + λ'' → λ'''
-      plusminus  (+-) — redistribution:  λ + λ' → λ'' + λ'''
-      minusminus (--) — splitting:       λ → λ' + λ'' + λ'''
+      plusplus   (++) -- recombination:    lambda + lambda' + lambda'' -> lambda'''
+      plusminus  (+-) -- redistribution:  lambda + lambda' -> lambda'' + lambda'''
+      minusminus (--) -- splitting:       lambda -> lambda' + lambda'' + lambda'''
  
     Parameters
     ----------
     base_dir : str
-    temp_dir : str
+        ShengBTE root directory.
  
     Returns
     -------
     dict
         Keys: 'p4', 'p4_plusplus', 'p4_plusminus', 'p4_minusminus'
-                                                     → ndarray or None
+              -> ndarray or None
               'p4_total', 'p4_plusplus_total',
               'p4_plusminus_total', 'p4_minusminus_total'
-                                                     → float or None
+              -> float or None
     """
     return {
         'p4'                  : _load(base_dir, "BTE.P4",                  "BTE.P4"),
@@ -384,7 +396,7 @@ def read_phase_space_4ph(base_dir, temp_dir):
         'p4_minusminus_total' : _read_scalar(base_dir, "BTE.P4_minusminus_total"),
     }
  
- 
+    
 def read_cumulative_kappa_mfp(temp_dir):
     """
     Read BTE.cumulative_kappa_tensor: cumulative kappa vs. MFP.
@@ -767,22 +779,6 @@ def process_temperature(temp_K, temp_dir, base_dir, fourphonon):
                 f"4-phonon lifetime at {temp_K} K",
                 freq, rates_4ph)
  
-    # ---------------------------------------------------- 3ph phase space
-    ps3 = read_phase_space_3ph(base_dir, temp_dir)
-    if any(ps3[k] is not None for k in ('p3', 'p3_plus', 'p3_minus')):
-        write_phase_space_3ph(
-            os.path.join(temp_dir, "phase_space_3ph.dat"),
-            freq, ps3)
- 
-    # ---------------------------------------------------- 4ph phase space
-    if fourphonon:
-        ps4 = read_phase_space_4ph(base_dir, temp_dir)
-        if any(ps4[k] is not None for k in ('p4', 'p4_plusplus',
-                                             'p4_plusminus', 'p4_minusminus')):
-            write_phase_space_4ph(
-                os.path.join(temp_dir, "phase_space_4ph.dat"),
-                freq, ps4)
- 
     # ----------------------------------------- cumulative kappa vs. MFP
     cum_mfp = read_cumulative_kappa_mfp(temp_dir)
     if cum_mfp is not None:
@@ -839,6 +835,28 @@ def main():
                 kappa_4ph)
  
     # ------------------------------------------------ per-temperature files
+    # ------------------------------------------------ phase space (once, temperature-independent)
+    print("\n--- Phase space ---")
+    # Use omega from the first selected temperature to build the frequency axis
+    _first_tdir = sel_tdirs[sorted(sel_tdirs.keys())[0]]
+    _omega_ref  = read_omega(_first_tdir)
+    if _omega_ref is not None:
+        _freq_ref = _to_THz(_omega_ref)
+        ps3 = read_phase_space_3ph(base_dir)
+        if any(ps3[k] is not None for k in ('p3', 'p3_plus', 'p3_minus')):
+            write_phase_space_3ph(
+                os.path.join(base_dir, "phase_space_3ph.dat"),
+                _freq_ref, ps3)
+        if fourphonon:
+            ps4 = read_phase_space_4ph(base_dir)
+            if any(ps4[k] is not None for k in ('p4', 'p4_plusplus',
+                                                 'p4_plusminus', 'p4_minusminus')):
+                write_phase_space_4ph(
+                    os.path.join(base_dir, "phase_space_4ph.dat"),
+                    _freq_ref, ps4)
+    else:
+        print("  WARNING: BTE.omega not found — phase space output skipped.")
+ 
     print("\n--- Per-temperature quantities ---")
     for T in sorted(sel_tdirs.keys()):
         process_temperature(T, sel_tdirs[T], base_dir, fourphonon)
