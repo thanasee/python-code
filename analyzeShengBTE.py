@@ -12,7 +12,7 @@ def usage():
     text = """
 Usage: analyzeShengBTE.py
 
-This script extract thermal transport data from ShengBTE (and FourPhonon) output files.
+This script extracts thermal transport data from ShengBTE (and FourPhonon) output files.
 Run from the ShengBTE output directory.
 
 This script was developed by Thanasee Thanasarnsurapong.
@@ -111,7 +111,10 @@ def select_temperatures(temp_dirs):
             parts = token.split('-')
             try:
                 lo, hi = int(parts[0]), int(parts[1])
-                selected_idx.update(range(lo, hi + 1))
+                if lo > hi:
+                    print(f"  WARNING: Invalid range '{token}' (start > end) — skipping.")
+                else:
+                    selected_idx.update(range(lo, hi + 1))
             except (ValueError, IndexError):
                 print(f"  WARNING: Cannot parse range '{token}' — skipping.")
         else:
@@ -269,12 +272,13 @@ def read_scattering_rate(temp_dir, suffix):
     print(f"  WARNING: 'BTE.w_{suffix}' not found — skipping.")
     return None
  
-
+ 
 def read_w4(temp_dir, suffix="total"):
     """
     Read 4ph scattering rates from BTE.w4_{suffix} (FourPhonon).
  
-    Falls back to BTE.w4_anharmonic when BTE.w4_total is absent.
+    When suffix is 'total' and BTE.w4_total is absent, falls back silently to
+    BTE.w4_anharmonic and prints a single informational message.
  
     Parameters
     ----------
@@ -284,13 +288,18 @@ def read_w4(temp_dir, suffix="total"):
     Returns
     -------
     numpy.ndarray or None
-        Shape (n_modes,), units ps⁻¹.
+        Shape (n_modes,), units ps-1.
     """
-    data = _load(temp_dir, f"BTE.w4_{suffix}", f"BTE.w4_{suffix}")
-    if data is None and suffix == "total":
-        data = _load(temp_dir, "BTE.w4_anharmonic",
-                     "BTE.w4_anharmonic (fallback for BTE.w4_total)")
-    return data
+    path = os.path.join(temp_dir, f"BTE.w4_{suffix}")
+    if os.path.isfile(path):
+        return np.loadtxt(path)
+    if suffix == "total":
+        fallback = os.path.join(temp_dir, "BTE.w4_anharmonic")
+        if os.path.isfile(fallback):
+            print("  INFO: BTE.w4_total not found — using BTE.w4_anharmonic.")
+            return np.loadtxt(fallback)
+    print(f"  WARNING: 'BTE.w4_{suffix}' not found — skipping.")
+    return None
  
  
 def _read_scalar(directory, fname):
@@ -352,7 +361,7 @@ def read_phase_space_3ph(base_dir):
         'p3_minus_total' : _read_scalar(base_dir, "BTE.P3_minus_total"),
     }
  
-    
+ 
 def read_phase_space_4ph(base_dir):
     """
     Read all 4-phonon phase space data (FourPhonon).
@@ -396,7 +405,7 @@ def read_phase_space_4ph(base_dir):
         'p4_minusminus_total' : _read_scalar(base_dir, "BTE.P4_minusminus_total"),
     }
  
-    
+ 
 def read_cumulative_kappa_mfp(temp_dir):
     """
     Read BTE.cumulative_kappa_tensor: cumulative kappa vs. MFP.
@@ -465,7 +474,7 @@ def write_kappa_tensor_vs_T(outpath, label, kappa_data):
     outpath : str
     label : str
     kappa_data : numpy.ndarray
-        Shape (n_temps, 7): T(K) + kappa_xx…xy  [W/(m K)].
+        Shape (n_temps, 7): T(K) + kappa_xx...xy  [W/(m K)].
     """
     with open(outpath, 'w') as o:
         o.write(f"# {label}\n")
@@ -532,7 +541,7 @@ def write_scattering_rate(outpath, label, freq_THz, rates):
     freq_THz : numpy.ndarray
         Shape (n_modes,).
     rates : numpy.ndarray
-        Scattering rates in ps⁻¹, shape (n_modes,).
+        Scattering rates in ps-1, shape (n_modes,).
     """
     with open(outpath, 'w') as o:
         o.write(f"# {label}\n")
@@ -558,7 +567,7 @@ def write_lifetime(outpath, label, freq_THz, rates):
     freq_THz : numpy.ndarray
         Shape (n_modes,).
     rates : numpy.ndarray
-        Scattering rates in ps⁻¹, shape (n_modes,).
+        Scattering rates in ps-1, shape (n_modes,).
     """
     with open(outpath, 'w') as o:
         o.write(f"# {label}\n")
@@ -586,8 +595,8 @@ def write_phase_space_3ph(outpath, freq_THz, ps):
     in the file header. The per-mode columns are P3, P3_plus, P3_minus.
  
     3ph channels:
-      plus  (+) — absorption: λ + λ' → λ''
-      minus (−) — emission:   λ → λ' + λ''
+      plus  (+): absorption  lambda + lambda' -> lambda''
+      minus (-): emission    lambda -> lambda' + lambda''
  
     Parameters
     ----------
@@ -610,6 +619,9 @@ def write_phase_space_3ph(outpath, freq_THz, ps):
         o.write(_scalar_line("P3_total",       ps['p3_total']))
         o.write(_scalar_line("P3_plus_total",  ps['p3_plus_total']))
         o.write(_scalar_line("P3_minus_total", ps['p3_minus_total']))
+        if ps['p3']       is None: o.write("# WARNING: BTE.P3 not found — P3 column is zero-filled\n")
+        if ps['p3_plus']  is None: o.write("# WARNING: BTE.P3_plus not found — P3_plus column is zero-filled\n")
+        if ps['p3_minus'] is None: o.write("# WARNING: BTE.P3_minus not found — P3_minus column is zero-filled\n")
         o.write(P3_HEADER + "\n")
         for freq, tot, plus, minus in zip(freq_THz, p3_arr, pp_arr, pm_arr):
             o.write(f"{freq:>16.6f}  {tot:>14.6e}  {plus:>14.6e}  {minus:>14.6e}\n")
@@ -626,9 +638,9 @@ def write_phase_space_4ph(outpath, freq_THz, ps):
     P4_minusminus.
  
     4ph channels:
-      plusplus   (++): recombination   λ + λ' + λ'' → λ'''
-      plusminus  (+-): redistribution  λ + λ' → λ'' + λ'''
-      minusminus (--): splitting       λ → λ' + λ'' + λ'''
+      plusplus   (++): recombination   lambda + lambda' + lambda'' -> lambda'''
+      plusminus  (+-): redistribution  lambda + lambda' -> lambda'' + lambda'''
+      minusminus (--): splitting       lambda -> lambda' + lambda'' + lambda'''
  
     Parameters
     ----------
@@ -654,6 +666,10 @@ def write_phase_space_4ph(outpath, freq_THz, ps):
         o.write(_scalar_line("P4_plusplus_total",   ps['p4_plusplus_total']))
         o.write(_scalar_line("P4_plusminus_total",  ps['p4_plusminus_total']))
         o.write(_scalar_line("P4_minusminus_total", ps['p4_minusminus_total']))
+        if ps['p4']            is None: o.write("# WARNING: BTE.P4 not found — P4 column is zero-filled\n")
+        if ps['p4_plusplus']   is None: o.write("# WARNING: BTE.P4_plusplus not found — P4_plusplus column is zero-filled\n")
+        if ps['p4_plusminus']  is None: o.write("# WARNING: BTE.P4_plusminus not found — P4_plusminus column is zero-filled\n")
+        if ps['p4_minusminus'] is None: o.write("# WARNING: BTE.P4_minusminus not found — P4_minusminus column is zero-filled\n")
         o.write(P4_HEADER + "\n")
         for freq, tot, pp, pm, mm in zip(freq_THz, p4_arr, pp_arr, ppm_arr, mm_arr):
             o.write(f"{freq:>16.6f}  {tot:>14.6e}  {pp:>14.6e}  {pm:>14.6e}  {mm:>14.6e}\n")
@@ -705,7 +721,7 @@ def write_cumulative_kappa_freq(outpath, label, freq_THz, data):
     print(f"  Written: {outpath}")
 
 
-def process_temperature(temp_K, temp_dir, base_dir, fourphonon):
+def process_temperature(temp_K, temp_dir, fourphonon, freq=None):
     """
     Extract all available ShengBTE (and FourPhonon) quantities for one
     temperature and write the corresponding .dat files.
@@ -716,19 +732,27 @@ def process_temperature(temp_K, temp_dir, base_dir, fourphonon):
         Temperature in Kelvin.
     temp_dir : str
         Absolute path to the T-*K subdirectory.
-    base_dir : str
-        ShengBTE root directory (needed for BTE.P3/P4 scalar totals).
     fourphonon : bool
         Whether FourPhonon output was detected.
+    freq : numpy.ndarray or None, optional
+        Pre-computed frequency array (THz). When provided, BTE.omega is not
+        re-read for this temperature. Used by main() to avoid reading the
+        first temperature's BTE.omega twice.
+
+    Notes
+    -----
+    Phase space (temperature-independent) is written once in main(),
+    not inside this function.
     """
     print(f"\n  T = {temp_K} K")
  
     # ----------------------------------------------------------------- omega
-    omega = read_omega(temp_dir)
-    if omega is None:
-        print(f"  BTE.omega missing — skipping T = {temp_K} K entirely.")
-        return
-    freq = _to_THz(omega)
+    if freq is None:
+        omega = read_omega(temp_dir)
+        if omega is None:
+            print(f"  BTE.omega missing — skipping T = {temp_K} K entirely.")
+            return
+        freq = _to_THz(omega)
  
     # ------------------------------------------------------ mode kappa (3ph)
     kappa_rta = read_kappa_mode(temp_dir, "RTA")
@@ -798,9 +822,12 @@ def process_temperature(temp_K, temp_dir, base_dir, fourphonon):
 
 
 def main():
-    if '-h' in argv or len(argv) != 1:
+    if len(argv) > 1 and '-h' not in argv:
+        print(f"ERROR: unexpected argument '{argv[1]}' — this script takes no arguments.")
         usage()
-    
+    if '-h' in argv:
+        usage()
+ 
     base_dir   = os.path.abspath(os.getcwd())
     all_tdirs  = detect_temperature_dirs(base_dir)
     sel_tdirs  = select_temperatures(all_tdirs)
@@ -834,32 +861,33 @@ def main():
                 "Thermal conductivity tensor vs. T (3ph+4ph RTA)",
                 kappa_4ph)
  
-    # ------------------------------------------------ per-temperature files
     # ------------------------------------------------ phase space (once, temperature-independent)
     print("\n--- Phase space ---")
-    # Use omega from the first selected temperature to build the frequency axis
-    _first_tdir = sel_tdirs[sorted(sel_tdirs.keys())[0]]
-    _omega_ref  = read_omega(_first_tdir)
-    if _omega_ref is not None:
-        _freq_ref = _to_THz(_omega_ref)
+    first_tdir = sel_tdirs[sorted(sel_tdirs.keys())[0]]
+    omega_ref  = read_omega(first_tdir)
+    if omega_ref is not None:
+        freq_ref = _to_THz(omega_ref)
         ps3 = read_phase_space_3ph(base_dir)
         if any(ps3[k] is not None for k in ('p3', 'p3_plus', 'p3_minus')):
             write_phase_space_3ph(
                 os.path.join(base_dir, "phase_space_3ph.dat"),
-                _freq_ref, ps3)
+                freq_ref, ps3)
         if fourphonon:
             ps4 = read_phase_space_4ph(base_dir)
             if any(ps4[k] is not None for k in ('p4', 'p4_plusplus',
                                                  'p4_plusminus', 'p4_minusminus')):
                 write_phase_space_4ph(
                     os.path.join(base_dir, "phase_space_4ph.dat"),
-                    _freq_ref, ps4)
+                    freq_ref, ps4)
     else:
         print("  WARNING: BTE.omega not found — phase space output skipped.")
  
+    # ------------------------------------------------ per-temperature files
     print("\n--- Per-temperature quantities ---")
     for T in sorted(sel_tdirs.keys()):
-        process_temperature(T, sel_tdirs[T], base_dir, fourphonon)
+        # Pass freq_ref for the first temperature to avoid re-reading BTE.omega
+        pre_freq = freq_ref if (omega_ref is not None and T == sorted(sel_tdirs.keys())[0]) else None
+        process_temperature(T, sel_tdirs[T], fourphonon, freq=pre_freq)
  
     print("\nDone.")
 
