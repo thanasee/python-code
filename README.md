@@ -34,7 +34,7 @@ All scripts are standalone CLI tools written in Python using NumPy as the primar
 
 ### 1. Thermal Transport Analysis
 
-Scripts in this category read HDF5 output files from [Phono3py](https://phonopy.github.io/phono3py/) and analyze lattice thermal conductivity data.
+Scripts in this category read HDF5 output files from [Phono3py](https://phonopy.github.io/phono3py/) or output files from [ShengBTE](https://www.shengbte.org/) and analyze lattice thermal conductivity data.
 
 ---
 
@@ -90,14 +90,14 @@ Usage: compareIFCs.py <DFT's force constants HDF5 input> <MLFF's force constants
 ```
 
 **Output files:**
-- `2ndIFCs.dat` — 2nd-order IFC comparison in eV/Å²
-- `3rdIFCs.dat` — 3rd-order IFC comparison in eV/Å³
+- `2ndIFCs.dat` — 2nd-order IFC comparison in eV/Å^2
+- `3rdIFCs.dat` — 3rd-order IFC comparison in eV/Å^3
 
 ---
 
 #### `analyzeShengBTE.py`
 
-Extracts thermal transport properties from [ShengBTE](https://www.shengbte.org/) output files and writes them to `.dat` files suitable for plotting in xmgrace or matplotlib. FourPhonon four-phonon scattering quantities are auto-detected and extracted when present. Run from the ShengBTE output directory; no arguments are required.
+Extracts thermal transport properties from [ShengBTE](https://www.shengbte.org/) output files and writes them to `.dat` files suitable for plotting in xmgrace or matplotlib. [FourPhonon](https://github.com/FourPhonon/FourPhonon) four-phonon scattering quantities are auto-detected and extracted when present. Run from the ShengBTE output directory; no arguments are required.
 
 ```
 Usage: analyzeShengBTE.py
