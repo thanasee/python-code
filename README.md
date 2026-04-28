@@ -48,6 +48,8 @@ Usage: convergePhono3py.py
 
 Automatically scans for all `kappa-m*.hdf5` files, sorts them by mesh number, and writes convergence data. Supports all Phono3py calculation modes: `--br`, `--lbte`, `--wigner`, and their combinations (`kappa`, `kappa_RTA`, `kappa_C`, `kappa_P_RTA`, `kappa_TOT_RTA`, `kappa_P_exact`, `kappa_TOT_exact`).
 
+**2D renormalization:** After loading the HDF5 files, the script interactively asks for material dimensionality (3D or 2D). For 2D materials, it reads a `POSCAR` from the current directory to compute an effective layer thickness t_eff = z_range + r_vdW_top + r_vdW_bottom, where z_range is the distance between the outermost atomic planes projected onto the ab-plane normal, and r_vdW are the vdW radii of the topmost and bottommost atoms. All κ values are then multiplied by the renormalization factor (c · n̂) / t_eff, converting Phono3py's bulk-convention κ (W/m-K) to the true 2D sheet thermal conductivity (W/m-K, referenced to the physical layer thickness). The factor and thickness values are recorded in the output file headers.
+
 ---
 
 #### `analyzePhono3py.py`
@@ -59,6 +61,8 @@ Usage: analyzePhono3py.py <kappa HDF5 file> <gruneisen HDF5 file (optional)>
 ```
 
 Output filenames follow the pattern `<tag>-mXXXXXX.dat`, where the mesh token is preserved from the input filename. All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/m-K.
+
+**2D renormalization:** After loading the HDF5 file, the script interactively asks for material dimensionality (3D or 2D). The 2D renormalization procedure is identical to `convergePhono3py.py`: reads `POSCAR` from the current directory, computes t_eff = z_range + r_vdW_top + r_vdW_bottom via atomic projections onto the ab-plane normal, and multiplies all κ arrays by the factor (c · n̂) / t_eff before any output is written. The renormalization factor, c projection, and t_eff are recorded in the output file headers.
 
 **Temperature-dependent files** (one value per temperature row, written to the working directory):
 - `KappaVsT` — total κ tensor vs. temperature
