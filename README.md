@@ -430,4 +430,4 @@ All scripts follow the same conventions modeled on `vaspSupercell.py`:
 
 ## License
 
-Developed by [Thanasee Thanasarnsurapong](https://scholar.google.com/citations?user=4KHXv9gAAAAJ&hl=en). For research and academic use.
+Developed by [Thanasee Thanasarnsurapong](https://scholar.google.com/citations?user=4KHXv9gAAAAJ&hl=en) and [Cluade](https://claude.ai/). For research and academic use.
