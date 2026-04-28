@@ -111,6 +111,8 @@ All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) 
 - `kappa_tensor_RTA.dat` — total κ tensor vs. temperature (3-phonon RTA)
 - `kappa_tensor_CONV.dat` — total κ tensor vs. temperature (iterative solution, if available)
 - `kappa_tensor_4ph.dat` — total κ tensor vs. temperature (3ph+4ph RTA) *[FourPhonon only]*
+- `phase_space_3ph.dat` — 3-phonon phase space P3 (absorption + emission) vs. frequency; file header records the scalar totals P3\_total, P3\_plus\_total, P3\_minus\_total
+- `phase_space_4ph.dat` — 4-phonon phase space P4 (++, +−, −−) vs. frequency; header records P4\_total and each process-type total *[FourPhonon only]*
 
 **Per-temperature spectral files** (written into each selected `T-<int>K/` subdirectory):
 - `kappa_mode.dat` — mode κ vs. phonon frequency (THz), 3-phonon RTA
@@ -120,8 +122,6 @@ All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) 
 - `lifetime_3ph.dat` — 3-phonon phonon lifetime τ (ps) vs. frequency
 - `scattering_rate_4ph.dat` — 4-phonon scattering rate Γ (ps^-1) vs. frequency *[FourPhonon only]*
 - `lifetime_4ph.dat` — 4-phonon phonon lifetime τ (ps) vs. frequency *[FourPhonon only]*
-- `phase_space_3ph.dat` — 3-phonon phase space P3 (absorption + emission) vs. frequency; file header records the scalar totals P3\_total, P3\_plus\_total, P3\_minus\_total
-- `phase_space_4ph.dat` — 4-phonon phase space P4 (++, +−, −−) vs. frequency; header records P4\_total and each process-type total *[FourPhonon only]*
 - `cumulative_kappa_mfp.dat` — cumulative κ vs. mean free path (nm)
 - `cumulative_kappa_freq.dat` — cumulative κ vs. phonon frequency (THz)
 
