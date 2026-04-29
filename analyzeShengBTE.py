@@ -46,7 +46,7 @@ def _to_THz(omega_rad_ps):
 
 def detect_temperature_dirs(base_dir):
     """
-    Find all T-<int>K subdirectories in base_dir.
+    Find all T<int>K subdirectories in base_dir.
  
     Parameters
     ----------
@@ -59,12 +59,12 @@ def detect_temperature_dirs(base_dir):
         {temperature_K (int): absolute_path (str)}, sorted ascending.
     """
     dirs = {}
-    for d in glob.glob(os.path.join(base_dir, "T-*K")):
-        m = re.search(r"T-(\d+)K$", d)
+    for d in glob.glob(os.path.join(base_dir, "T*K")):
+        m = re.search(r"T(\d+)K$", d)
         if m and os.path.isdir(d):
             dirs[int(m.group(1))] = d
     if not dirs:
-        print(f"ERROR: No T-*K subdirectories found in '{base_dir}'.")
+        print(f"ERROR: No T*K subdirectories found in '{base_dir}'.")
         print("       Make sure you are pointing to the ShengBTE output directory.")
         exit(1)
     return dict(sorted(dirs.items()))
@@ -141,7 +141,7 @@ def detect_fourphonon(base_dir, temp_dirs):
     """
     Return True if FourPhonon output files are present.
  
-    Checks BTE.w4_* inside T-*K/ subdirectories (temperature-dependent)
+    Checks BTE.w4_* inside T*K/ subdirectories (temperature-dependent)
     and BTE.P4 in base_dir (temperature-independent).
  
     Parameters
@@ -731,7 +731,7 @@ def process_temperature(temp_K, temp_dir, fourphonon, freq=None):
     temp_K : int
         Temperature in Kelvin.
     temp_dir : str
-        Absolute path to the T-*K subdirectory.
+        Absolute path to the T*K subdirectory.
     fourphonon : bool
         Whether FourPhonon output was detected.
     freq : numpy.ndarray or None, optional
