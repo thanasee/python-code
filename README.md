@@ -10,10 +10,11 @@ A collection of Python scripts for VASP output analysis and related tasks, devel
 
 This repository is organized into four functional categories:
 
-1. **Thermal transport analysis** — extract and analyze lattice thermal conductivity variables from Phono3py HDF5 output files
+1. **Thermal transport analysis** — extract and analyze lattice thermal conductivity variables from Phono3py HDF5 output files and ShengBTE output files
 2. **Structural analysis** — calculate structural properties (e.g., bond distances) from VASP POSCAR/CONTCAR files
 3. **Mechanical properties** — extract and plot elastic tensors, piezoelectric tensors, and related quantities from VASP output files
 4. **Structure preparation** — generate and manipulate POSCAR files for various VASP calculations
+5. **MLFF utilities** — monitor training errors, evaluate MLFF accuracy against DFT references, and convert or merge VASP `ML_AB` training data files
 
 All scripts are standalone CLI tools written in Python using NumPy as the primary dependency. Each follows a consistent modular design with a `main()` entry point and NumPy-style docstrings.
 
@@ -48,7 +49,7 @@ Usage: convergePhono3py.py
 
 Automatically scans for all `kappa-m*.hdf5` files, sorts them by mesh number, and writes convergence data. Supports all Phono3py calculation modes: `--br`, `--lbte`, `--wigner`, and their combinations (`kappa`, `kappa_RTA`, `kappa_C`, `kappa_P_RTA`, `kappa_TOT_RTA`, `kappa_P_exact`, `kappa_TOT_exact`).
 
-**2D renormalization:** After loading the HDF5 files, the script interactively asks for material dimensionality (3D or 2D). For 2D materials, it reads a `POSCAR` from the current directory to compute an effective layer thickness t_eff = z_range + r_vdW_top + r_vdW_bottom, where z_range is the distance between the outermost atomic planes projected onto the ab-plane normal, and r_vdW are the vdW radii of the topmost and bottommost atoms. All κ values are then multiplied by the renormalization factor (c · n̂) / t_eff, converting Phono3py's bulk-convention κ (W/m-K) to the true 2D sheet thermal conductivity (W/m-K, referenced to the physical layer thickness). The factor and thickness values are recorded in the output file headers.
+**2D renormalization:** After loading the HDF5 files, the script interactively prompts whether the material is 2D (Y/N). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ values, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/m-K throughout.
 
 ---
 
@@ -62,7 +63,7 @@ Usage: analyzePhono3py.py <kappa HDF5 file> <gruneisen HDF5 file (optional)>
 
 Output filenames follow the pattern `<tag>-mXXXXXX.dat`, where the mesh token is preserved from the input filename. All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/m-K.
 
-**2D renormalization:** After loading the HDF5 file, the script interactively asks for material dimensionality (3D or 2D). The 2D renormalization procedure is identical to `convergePhono3py.py`: reads `POSCAR` from the current directory, computes t_eff = z_range + r_vdW_top + r_vdW_bottom via atomic projections onto the ab-plane normal, and multiplies all κ arrays by the factor (c · n̂) / t_eff before any output is written. The renormalization factor, c projection, and t_eff are recorded in the output file headers.
+**2D renormalization:** After loading the HDF5 file, the script interactively prompts whether the material is 2D (Y/N). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ arrays before any output is written, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/m-K throughout. The renormalization applies to all output file groups below.
 
 **Temperature-dependent files** (one value per temperature row, written to the working directory):
 - `KappaVsT` — total κ tensor vs. temperature
@@ -115,8 +116,6 @@ All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) 
 - `kappa_tensor_RTA.dat` — total κ tensor vs. temperature (3-phonon RTA)
 - `kappa_tensor_CONV.dat` — total κ tensor vs. temperature (iterative solution, if available)
 - `kappa_tensor_4ph.dat` — total κ tensor vs. temperature (3ph+4ph RTA) *[FourPhonon only]*
-- `phase_space_3ph.dat` — 3-phonon phase space P3 (absorption + emission) vs. frequency; file header records the scalar totals P3\_total, P3\_plus\_total, P3\_minus\_total
-- `phase_space_4ph.dat` — 4-phonon phase space P4 (++, +−, −−) vs. frequency; header records P4\_total and each process-type total *[FourPhonon only]*
 
 **Per-temperature spectral files** (written into each selected `T-<int>K/` subdirectory):
 - `kappa_mode.dat` — mode κ vs. phonon frequency (THz), 3-phonon RTA
@@ -128,6 +127,10 @@ All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) 
 - `lifetime_4ph.dat` — 4-phonon phonon lifetime τ (ps) vs. frequency *[FourPhonon only]*
 - `cumulative_kappa_mfp.dat` — cumulative κ vs. mean free path (nm)
 - `cumulative_kappa_freq.dat` — cumulative κ vs. phonon frequency (THz)
+
+**Temperature-independent files** (written to the working directory):
+- `phase_space_3ph.dat` — 3-phonon phase space P3 (absorption + emission) vs. frequency; file header records the scalar totals P3\_total, P3\_plus\_total, P3\_minus\_total
+- `phase_space_4ph.dat` — 4-phonon phase space P4 (++, +−, −−) vs. frequency; header records P4\_total and each process-type total *[FourPhonon only]*
 
 ---
 
