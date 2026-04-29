@@ -1059,7 +1059,7 @@ def main():
         exit(0)
     
     # ── Dimensionality: optional 2D renormalization ───────────────────────────
-    renorm_factor, renorm_info = ask_dimensionality(kappa_input_file)
+    renorm_factor, renorm_info = ask_dimensionality()
  
     if renorm_factor != 1.0:
         # Renormalize all kappa arrays: k_2D = k_phono3py * (c / t_eff)
@@ -1164,11 +1164,17 @@ def main():
     ).sum(axis=1).sum(axis=1) / weight.sum()
 
     if kappa_RTA is not None:
-        tau_CRTA = kappa_RTA / kappa_per_tau
+        with np.errstate(divide='ignore', invalid='ignore'):
+            tau_CRTA = np.where(kappa_per_tau > 0.0,
+                                kappa_RTA / kappa_per_tau, 0.0)
     elif kappa_P_RTA is not None:
-        tau_CRTA = kappa_P_RTA / kappa_per_tau
+        with np.errstate(divide='ignore', invalid='ignore'):
+            tau_CRTA = np.where(kappa_per_tau > 0.0,
+                                kappa_P_RTA / kappa_per_tau, 0.0)
     else:
-        tau_CRTA = kappa / kappa_per_tau
+        with np.errstate(divide='ignore', invalid='ignore'):
+            tau_CRTA = np.where(kappa_per_tau > 0.0,
+                                kappa / kappa_per_tau, 0.0)
 
     # Average lifetime over all q-points and bands
     tau_avg = tau.sum(axis=1).sum(axis=1) / weight.sum()
@@ -1371,7 +1377,7 @@ def main():
                 os.path.join(temp_dir, outpath(kappa_input_file, 'Tau_UVsFrequency')),
                 "Lifetime vs Frequency", frequency, tau_U, temp_index)
 
-    print("Convert HDF5 file to DAT files ... Finished!")
+    print("\nConvert HDF5 file to DAT files ... Finished!")
 
 
 if __name__ == "__main__":
