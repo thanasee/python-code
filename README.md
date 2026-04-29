@@ -108,7 +108,7 @@ Extracts thermal transport properties from [ShengBTE](https://www.shengbte.org/)
 Usage: analyzeShengBTE.py
 ```
 
-Temperature subdirectories (`T-<int>K/`) are detected automatically from the working directory. If more than one temperature is found, an interactive prompt asks which temperature(s) to process. FourPhonon is detected by the presence of `BTE.w4_*` or `BTE.P4` files inside any `T-<int>K/` subdirectory.
+Temperature subdirectories (`T<int>K/`) are detected automatically from the working directory. If more than one temperature is found, an interactive prompt asks which temperature(s) to process. FourPhonon is detected by the presence of `BTE.w4_*` or `BTE.P4` files inside any `T-<int>K/` subdirectory.
 
 All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/(m·K).
 
@@ -117,7 +117,7 @@ All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) 
 - `kappa_tensor_CONV.dat` — total κ tensor vs. temperature (iterative solution, if available)
 - `kappa_tensor_4ph.dat` — total κ tensor vs. temperature (3ph+4ph RTA) *[FourPhonon only]*
 
-**Per-temperature spectral files** (written into each selected `T-<int>K/` subdirectory):
+**Per-temperature spectral files** (written into each selected `T<int>K/` subdirectory):
 - `kappa_mode.dat` — mode κ vs. phonon frequency (THz), 3-phonon RTA
 - `kappa_mode_4ph.dat` — mode κ vs. frequency, 3ph+4ph RTA *[FourPhonon only]*
 - `gruneisen.dat` — Grüneisen parameter vs. frequency
