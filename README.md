@@ -49,7 +49,7 @@ Usage: convergePhono3py.py
 
 Automatically scans for all `kappa-m*.hdf5` files, sorts them by mesh number, and writes convergence data. Supports all Phono3py calculation modes: `--br`, `--lbte`, `--wigner`, and their combinations (`kappa`, `kappa_RTA`, `kappa_C`, `kappa_P_RTA`, `kappa_TOT_RTA`, `kappa_P_exact`, `kappa_TOT_exact`).
 
-**2D renormalization:** After loading the HDF5 files, the script interactively prompts whether the material is 2D (Y/N). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ values, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/m-K throughout.
+**2D renormalization:** After loading the HDF5 files, the script interactively prompts for dimensionality (1 = 3D, 2 = 2D). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ values, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/m-K throughout.
 
 ---
 
@@ -63,7 +63,7 @@ Usage: analyzePhono3py.py <kappa HDF5 file> <gruneisen HDF5 file (optional)>
 
 Output filenames follow the pattern `<tag>-mXXXXXX.dat`, where the mesh token is preserved from the input filename. All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/m-K.
 
-**2D renormalization:** After loading the HDF5 file, the script interactively prompts whether the material is 2D (Y/N). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ arrays before any output is written, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/m-K throughout. The renormalization applies to all output file groups below.
+**2D renormalization:** After loading the HDF5 file, the script interactively prompts for dimensionality (1 = 3D, 2 = 2D). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ arrays before any output is written, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/m-K throughout. The renormalization applies to all output file groups below.
 
 **Temperature-dependent files** (one value per temperature row, written to the working directory):
 - `KappaVsT` — total κ tensor vs. temperature
