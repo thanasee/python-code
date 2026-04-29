@@ -21,12 +21,15 @@ This script was developed by Thanasee Thanasarnsurapong.
     exit(0)
 
 
-TENSOR_HEADER  = ("#  T(K)          xx          yy          zz"
-                  "          yz          xz          xy")
-FREQ_HEADER    = ("#  Frequency(THz)    xx            yy            zz"
-                  "            yz            xz            xy")
-MFP_HEADER     = ("#  MFP(nm)           xx            yy            zz"
-                  "            yz            xz            xy")
+TENSOR_HEADER  = ("#  T(K)          xx          xy          xz"
+                  "          yx          yy          yz"
+                  "          zx          zy          zz")
+FREQ_HEADER    = ("#  Frequency(THz)    xx            xy            xz"
+                  "            yx            yy            yz"
+                  "            zx            zy            zz")
+MFP_HEADER     = ("#  MFP(nm)           xx            xy            xz"
+                  "            yx            yy            yz"
+                  "            zx            zy            zz")
 GAMMA_HEADER   = "#  Frequency(THz)    Gamma(ps-1)"
 TAU_HEADER     = "#  Frequency(THz)    Tau(ps)"
 GRUN_HEADER    = "#  Frequency(THz)    Gruneisen"
@@ -34,11 +37,40 @@ P3_HEADER      = "#  Frequency(THz)    P3            P3_plus       P3_minus"
 P4_HEADER      = "#  Frequency(THz)    P4            P4_plusplus   P4_plusminus  P4_minusminus"
  
  
-def _fmt6(row):
-    """Format 6 kappa tensor components."""
+def _fmt9(row):
+    """Format 9 kappa tensor components (full 3x3 row-major)."""
     return "".join(f"  {v:>12.4f}" for v in row)
+
  
  
+def _write_blocks(f, rows, band_indices=None):
+    """
+    Write rows to an open file handle, inserting a blank line between
+    each phonon band.
+
+    Band separation is detected from band_indices: a blank line is inserted
+    whenever band_indices[i] differs from band_indices[i-1].
+    All per-mode files share the same mode ordering as BTE.kappa, so the
+    band index array from BTE.kappa col0 applies universally.
+
+    Produces xmgrace-compatible multiset format (one dataset per phonon band).
+
+    Parameters
+    ----------
+    f : file object
+        Open file handle to write to.
+    rows : list of str
+        Pre-formatted data lines (without trailing newline).
+    band_indices : array-like or None
+        Integer band index per row (from BTE.kappa col0).
+        If None, rows are written without separation.
+    """
+    for i, row in enumerate(rows):
+        if band_indices is not None and i > 0 and band_indices[i] != band_indices[i - 1]:
+            f.write("\n")
+        f.write(row + "\n")
+
+
 def _to_THz(omega_rad_ps):
     """Convert angular frequency rad/ps to THz."""
     return omega_rad_ps / (2.0 * np.pi)
@@ -168,394 +200,416 @@ def detect_fourphonon(base_dir, temp_dirs):
     return False
  
  
-def _load(directory, fname, label=""):
+
+# ===========================================================================
+# Low-level file I/O
+# ===========================================================================
+
+def _readcols(path, label=""):
     """
-    Load a whitespace-delimited ShengBTE plain-text file.
- 
+    Read a ShengBTE plain-text file into a 2-D NumPy array.
+
+    Skips blank lines and lines beginning with '#'.
+    Always returns a 2-D array regardless of the number of data rows,
+    so single-row files are handled without special-casing.
+
     Parameters
     ----------
-    directory : str
-    fname : str
-        Basename of the file.
+    path : str
+        Absolute path to the file.
     label : str
-        Label used in the warning message.
- 
+        Name shown in warning messages when the file is absent or empty.
+
     Returns
     -------
     numpy.ndarray or None
+        Shape (n_rows, n_cols).  None if the file is missing or empty.
     """
-    path = os.path.join(directory, fname)
     if not os.path.isfile(path):
-        tag = label if label else fname
-        print(f"  WARNING: '{tag}' not found — skipping.")
+        print(f"  WARNING: '{label or os.path.basename(path)}' not found — skipping.")
         return None
-    return np.loadtxt(path)
- 
- 
-def read_omega(base_dir):
-    """
-    Read BTE.omega: angular frequencies (rad/ps), one per mode.
-
-    BTE.omega is temperature-independent and lives in the root ShengBTE
-    directory, not inside T*K/ subdirectories.
-
-    The file contains one angular frequency per line (single column).
-    If the file has multiple columns the last column is taken as the
-    frequency, consistent with ShengBTE output conventions.
-
-    Parameters
-    ----------
-    base_dir : str
-        ShengBTE root directory.
-
-    Returns
-    -------
-    numpy.ndarray or None
-        Shape (n_modes,).
-    """
-    data = _load(base_dir, "BTE.omega", "BTE.omega")
-    if data is None:
+    rows = []
+    with open(path) as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            rows.append([float(x) for x in line.split()])
+    if not rows:
+        print(f"  WARNING: '{label or os.path.basename(path)}' is empty — skipping.")
         return None
-    data = np.atleast_1d(data)
-    if data.ndim == 2:
-        return data[:, -1]   # take frequency column (last) if multi-column
-    return data
- 
- 
-def read_kappa_mode(temp_dir):
-    """
-    Read per-band kappa from BTE.kappa (inside a T*K/ subdirectory).
+    return np.array(rows)
 
-    ShengBTE writes one row per phonon band per convergence iteration.
-    The final n_bands rows (last block) contain the RTA or converged values.
-    Columns: omega(rad/ps)  kappa_xx  yy  zz  yz  xz  xy
 
-    BTE.kappa is the only per-mode kappa file produced by both ShengBTE and
-    FourPhonon; there is no separate BTE.kappa_RTA or BTE.kappa_4ph file.
-
-    Parameters
-    ----------
-    temp_dir : str
-
-    Returns
-    -------
-    numpy.ndarray or None
-        Shape (n_modes, 7).
-    """
-    data = _load(temp_dir, "BTE.kappa", "BTE.kappa")
-    if data is not None:
-        data = np.atleast_2d(data)
-    return data
- 
- 
-def read_gruneisen(base_dir):
-    """
-    Read BTE.gruneisen: Gruneisen parameter per mode.
-
-    BTE.gruneisen is temperature-independent and lives in the root ShengBTE
-    directory, not inside T*K/ subdirectories.
-
-    Parameters
-    ----------
-    base_dir : str
-        ShengBTE root directory.
-
-    Returns
-    -------
-    numpy.ndarray or None
-        Shape (n_modes,).
-    """
-    data = _load(base_dir, "BTE.gruneisen", "BTE.gruneisen")
-    if data is None:
-        return None
-    data = np.atleast_1d(data)
-    return data[:, -1] if data.ndim == 2 else data
- 
- 
-def read_scattering_rate(temp_dir, fourphonon=False):
-    """
-    Read the total 3-phonon scattering rate for each mode.
-
-    ShengBTE (3ph only) writes the total RTA scattering rate to BTE.w.
-    When FourPhonon is present, BTE.w_anharmonic is replaced by BTE.w_3ph;
-    in that case BTE.w_3ph is read instead.
-
-    Fallback chain (3ph-only):  BTE.w  ->  BTE.w_anharmonic
-    Fallback chain (FourPhonon): BTE.w_3ph  ->  BTE.w_anharmonic
-
-    Parameters
-    ----------
-    temp_dir : str
-    fourphonon : bool
-        When True, prefer BTE.w_3ph over BTE.w_anharmonic.
-
-    Returns
-    -------
-    numpy.ndarray or None
-        Shape (n_modes,), units ps-1.
-    """
-    if fourphonon:
-        # FourPhonon replaces BTE.w_anharmonic with BTE.w_3ph
-        p = os.path.join(temp_dir, "BTE.w_3ph")
-        if os.path.isfile(p):
-            d = np.loadtxt(p); d = np.atleast_1d(d)
-            return d[:, -1] if d.ndim == 2 else d
-        print("  WARNING: 'BTE.w_3ph' not found — skipping 3ph scattering rate.")
-        return None
-    else:
-        # Pure ShengBTE: total RTA rate is BTE.w; fallback to BTE.w_anharmonic
-        p = os.path.join(temp_dir, "BTE.w")
-        if os.path.isfile(p):
-            d = np.loadtxt(p); d = np.atleast_1d(d)
-            return d[:, -1] if d.ndim == 2 else d
-        fallback = os.path.join(temp_dir, "BTE.w_anharmonic")
-        if os.path.isfile(fallback):
-            print("  INFO: BTE.w not found — using BTE.w_anharmonic.")
-            d = np.loadtxt(fallback); d = np.atleast_1d(d)
-            return d[:, -1] if d.ndim == 2 else d
-        print("  WARNING: 'BTE.w' not found — skipping 3ph scattering rate.")
-        return None
- 
- 
-def read_w4(temp_dir):
-    """
-    Read the total 4-phonon scattering rate from BTE.w_4ph (FourPhonon).
-
-    FourPhonon writes the combined 4-phonon scattering rate to BTE.w_4ph.
-    Channel-resolved rates (BTE.w_4ph_plusplus, BTE.w_4ph_plusminus,
-    BTE.w_4ph_minusminus) are not extracted separately here; the total
-    is sufficient for scattering rate and lifetime outputs.
-
-    Parameters
-    ----------
-    temp_dir : str
-
-    Returns
-    -------
-    numpy.ndarray or None
-        Shape (n_modes,), units ps-1.
-    """
-    path = os.path.join(temp_dir, "BTE.w_4ph")
-    if os.path.isfile(path):
-        d = np.loadtxt(path); d = np.atleast_1d(d)
-        return d[:, -1] if d.ndim == 2 else d
-    print("  WARNING: 'BTE.w_4ph' not found — skipping 4ph scattering rate.")
-    return None
- 
- 
 def _read_scalar(directory, fname):
     """
-    Read a single-line ShengBTE file that contains exactly one scalar value.
- 
-    BTE.P3_total, BTE.P3_plus_total, BTE.P3_minus_total, BTE.P4_total, etc.
-    each contain a single number — the integrated phase space over all modes.
- 
+    Read a single-value ShengBTE summary file (e.g. BTE.P3_total).
+
     Parameters
     ----------
     directory : str
     fname : str
- 
+
     Returns
     -------
     float or None
     """
-    path = os.path.join(directory, fname)
-    if not os.path.isfile(path):
-        return None
-    try:
-        data = np.loadtxt(path)
-        return float(data.flat[0])
-    except Exception:
-        return None
- 
- 
-def read_phase_space_3ph(base_dir):
+    data = _readcols(os.path.join(directory, fname))
+    return float(data.flat[0]) if data is not None else None
+
+
+# ===========================================================================
+# Temperature-independent readers  (base_dir / root directory)
+# ===========================================================================
+
+def read_omega(base_dir):
     """
-    Read all 3-phonon phase space data.
- 
-    All files are temperature-independent and live in base_dir.
- 
-    Per-mode arrays (shape (n_modes,)):
-      BTE.P3, BTE.P3_plus, BTE.P3_minus
- 
-    Integrated scalar totals (single value):
-      BTE.P3_total, BTE.P3_plus_total, BTE.P3_minus_total
- 
+    Read BTE.omega: phonon angular frequencies (rad/ps).
+
+    File layout: (n_qpoints, n_bands)
+      Each row  = one irreducible q-point.
+      Each col  = one phonon band.
+    Flattened column-major ('F' order) so the resulting 1-D array has the
+    same mode ordering as BTE.kappa (q-index changes first per band block).
+
     Parameters
     ----------
     base_dir : str
         ShengBTE root directory.
- 
+
+    Returns
+    -------
+    numpy.ndarray or None
+        Shape (n_modes,), units rad/ps.
+    """
+    data = _readcols(os.path.join(base_dir, "BTE.omega"), "BTE.omega")
+    if data is None:
+        return None
+    return data.flatten('F')
+
+
+def read_band_idx(base_dir):
+    """
+    Derive the phonon band index for every mode from BTE.omega.
+
+    BTE.omega has shape (n_qpoints, n_bands).  After column-major flattening
+    the band index repeats n_qpoints times for each band:
+      [0, 0, ..., 0,  1, 1, ..., 1,  ...,  n_bands-1, ...]
+
+    Used by all per-mode writers to insert blank lines between bands
+    (xmgrace multiset format).
+
+    Parameters
+    ----------
+    base_dir : str
+        ShengBTE root directory.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        Integer band indices, shape (n_modes,).
+    """
+    data = _readcols(os.path.join(base_dir, "BTE.omega"), "BTE.omega")
+    if data is None:
+        return None
+    n_qpoints, n_bands = data.shape
+    return np.repeat(np.arange(n_bands), n_qpoints)
+
+
+def read_gruneisen(base_dir):
+    """
+    Read BTE.gruneisen: mode Gruneisen parameters.
+
+    File layout: (n_qpoints, n_bands) — identical structure to BTE.omega.
+    Flattened column-major to align with BTE.kappa mode ordering.
+
+    Parameters
+    ----------
+    base_dir : str
+        ShengBTE root directory.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        Gruneisen values, shape (n_modes,).
+    """
+    data = _readcols(os.path.join(base_dir, "BTE.gruneisen"), "BTE.gruneisen")
+    if data is None:
+        return None
+    return data.flatten('F')
+
+
+def read_phase_space_3ph(base_dir):
+    """
+    Read 3-phonon phase space data.
+
+    All files are temperature-independent and live in base_dir.
+    Per-mode files contain a single column (phase space value).
+    Mode ordering is the same as BTE.omega; frequency axis is taken
+    externally from BTE.omega.
+
+    Files:
+      BTE.P3, BTE.P3_plus, BTE.P3_minus          (per-mode, single col)
+      BTE.P3_total, BTE.P3_plus_total,
+      BTE.P3_minus_total                          (integrated scalar)
+
+    3ph channels:
+      plus  (+): absorption   lambda + lambda' -> lambda''
+      minus (-): emission     lambda -> lambda' + lambda''
+
+    Parameters
+    ----------
+    base_dir : str
+        ShengBTE root directory.
+
     Returns
     -------
     dict
-        Keys: 'p3', 'p3_plus', 'p3_minus'        -> ndarray or None
-              'p3_total', 'p3_plus_total',
-              'p3_minus_total'                      -> float or None
+        'p3', 'p3_plus', 'p3_minus'         -> ndarray (n_modes,) or None
+        'p3_total', 'p3_plus_total',
+        'p3_minus_total'                     -> float or None
     """
-    def _load1d(primary, *alts):
-        """
-        Try primary filename first, then each alt in order, silently.
-        Only warn if all candidates are absent.
-        Returns 1-D ndarray (last column if multi-column) or None.
-        """
-        for fname in (primary,) + alts:
-            path = os.path.join(base_dir, fname)
-            if os.path.isfile(path):
-                d = np.atleast_1d(np.loadtxt(path))
-                return d[:, -1] if d.ndim == 2 else d
-        tried = ', '.join((primary,) + alts)
-        print(f"  WARNING: none of [{tried}] found — skipping.")
-        return None
+    def _col0(fname):
+        data = _readcols(os.path.join(base_dir, fname), fname)
+        return data[:, 0] if data is not None else None
 
     return {
-        'p3'             : _load1d("BTE.P3"),
-        'p3_plus'        : _load1d("BTE.P3_plus"),
-        'p3_minus'       : _load1d("BTE.P3_minus"),
+        'p3'             : _col0("BTE.P3"),
+        'p3_plus'        : _col0("BTE.P3_plus"),
+        'p3_minus'       : _col0("BTE.P3_minus"),
         'p3_total'       : _read_scalar(base_dir, "BTE.P3_total"),
         'p3_plus_total'  : _read_scalar(base_dir, "BTE.P3_plus_total"),
         'p3_minus_total' : _read_scalar(base_dir, "BTE.P3_minus_total"),
     }
- 
- 
+
+
 def read_phase_space_4ph(base_dir):
     """
-    Read all 4-phonon phase space data (FourPhonon).
- 
+    Read 4-phonon phase space data (FourPhonon).
+
     All files are temperature-independent and live in base_dir.
- 
-    Per-mode arrays (shape (n_modes,)):
-      BTE.P4, BTE.P4_plusplus, BTE.P4_plusminus, BTE.P4_minusminus
- 
-    Integrated scalar totals (single value):
-      BTE.P4_total, BTE.P4_plusplus_total, BTE.P4_plusminus_total,
-      BTE.P4_minusminus_total
- 
-    The three 4ph scattering channels are:
-      plusplus   (++) -- recombination:    lambda + lambda' + lambda'' -> lambda'''
-      plusminus  (+-) -- redistribution:  lambda + lambda' -> lambda'' + lambda'''
-      minusminus (--) -- splitting:       lambda -> lambda' + lambda'' + lambda'''
- 
+    Per-mode files contain a single column (phase space value).
+    A glob-based lookup is used to tolerate filename whitespace quirks
+    on Lustre filesystems.
+
+    Files:
+      BTE.P4, BTE.P4_plusplus, BTE.P4_plusminus,
+      BTE.P4_minusminus                           (per-mode, single col)
+      BTE.P4_total, BTE.P4_plusplus_total,
+      BTE.P4_plusminus_total, BTE.P4_minusminus_total   (integrated scalar)
+
+    4ph channels:
+      plusplus   (++): recombination   lambda + lambda' + lambda'' -> lambda'''
+      plusminus  (+-): redistribution  lambda + lambda' -> lambda'' + lambda'''
+      minusminus (--): splitting       lambda -> lambda' + lambda'' + lambda'''
+
     Parameters
     ----------
     base_dir : str
         ShengBTE root directory.
- 
+
     Returns
     -------
     dict
-        Keys: 'p4', 'p4_plusplus', 'p4_plusminus', 'p4_minusminus'
-              -> ndarray or None
-              'p4_total', 'p4_plusplus_total',
-              'p4_plusminus_total', 'p4_minusminus_total'
-              -> float or None
+        'p4', 'p4_plusplus', 'p4_plusminus', 'p4_minusminus'
+                                             -> ndarray (n_modes,) or None
+        'p4_total', 'p4_plusplus_total',
+        'p4_plusminus_total', 'p4_minusminus_total'
+                                             -> float or None
     """
-    # Build a map of all BTE.P4* files actually present in base_dir,
-    # stripping any whitespace from filenames to handle encoding quirks.
-    p4_files = {}
-    for f in glob.glob(os.path.join(base_dir, "BTE.P4*")):
-        key = os.path.basename(f).strip()
-        p4_files[key] = f
+    # Glob-based map strips whitespace to handle Lustre filename encoding issues
+    p4_map = {os.path.basename(f).strip(): f
+               for f in glob.glob(os.path.join(base_dir, "BTE.P4*"))}
 
-    def _load1d(primary, *alts):
-        """
-        Try primary filename first, then each alt in order, using the
-        glob-based map to handle filename encoding or whitespace quirks.
-        Only warn if all candidates are absent.
-        Returns 1-D ndarray (last column if multi-column) or None.
-        """
-        for fname in (primary,) + alts:
-            path = p4_files.get(fname) or os.path.join(base_dir, fname)
-            if os.path.isfile(path):
-                d = np.atleast_1d(np.loadtxt(path))
-                return d[:, -1] if d.ndim == 2 else d
-        tried = ', '.join((primary,) + alts)
-        print(f"  WARNING: none of [{tried}] found — skipping.")
-        print(f"    (BTE.P4* files found: {sorted(p4_files.keys()) or 'none'})")
-        return None
+    def _col0(fname):
+        path = p4_map.get(fname, os.path.join(base_dir, fname))
+        data = _readcols(path, fname)
+        return data[:, 0] if data is not None else None
 
     return {
-        'p4'            : _load1d("BTE.P4"),
-        'p4_plusplus'   : _load1d("BTE.P4_plusplus"),
-        'p4_plusminus'  : _load1d("BTE.P4_plusminus"),
-        'p4_minusminus' : _load1d("BTE.P4_minusminus"),
+        'p4'                  : _col0("BTE.P4"),
+        'p4_plusplus'         : _col0("BTE.P4_plusplus"),
+        'p4_plusminus'        : _col0("BTE.P4_plusminus"),
+        'p4_minusminus'       : _col0("BTE.P4_minusminus"),
         'p4_total'            : _read_scalar(base_dir, "BTE.P4_total"),
         'p4_plusplus_total'   : _read_scalar(base_dir, "BTE.P4_plusplus_total"),
         'p4_plusminus_total'  : _read_scalar(base_dir, "BTE.P4_plusminus_total"),
         'p4_minusminus_total' : _read_scalar(base_dir, "BTE.P4_minusminus_total"),
     }
- 
- 
-def read_cumulative_kappa_mfp(temp_dir):
-    """
-    Read BTE.cumulative_kappa_tensor: cumulative kappa vs. MFP.
- 
-    Columns: mfp(nm)  kappa_xx  yy  zz  yz  xz  xy
- 
-    Parameters
-    ----------
-    temp_dir : str
- 
-    Returns
-    -------
-    numpy.ndarray or None
-        Shape (n_points, 7).
-    """
-    data = _load(temp_dir, "BTE.cumulative_kappa_tensor",
-                 "BTE.cumulative_kappa_tensor")
-    if data is not None:
-        data = np.atleast_2d(data)
-    return data
- 
- 
-def read_cumulative_kappa_freq(temp_dir):
-    """
-    Read BTE.cumulative_kappaVsOmega_tensor: cumulative kappa vs. frequency.
- 
-    Columns: omega(rad/ps)  kappa_xx  yy  zz  yz  xz  xy
- 
-    Parameters
-    ----------
-    temp_dir : str
- 
-    Returns
-    -------
-    numpy.ndarray or None
-        Shape (n_points, 7).
-    """
-    data = _load(temp_dir, "BTE.cumulative_kappaVsOmega_tensor",
-                 "BTE.cumulative_kappaVsOmega_tensor")
-    if data is not None:
-        data = np.atleast_2d(data)
-    return data
- 
- 
+
+
 def read_kappa_tensor_vs_T(base_dir, method):
     """
-    Read BTE.KappaTensorVsT_{method} from the root directory.
+    Read BTE.KappaTensorVsT_{method}: total kappa tensor vs. temperature.
 
-    Columns: T(K)  kappa_xx  yy  zz  yz  xz  xy
+    ShengBTE writes the full 3x3 tensor in row-major order for each
+    temperature.
 
-    np.loadtxt returns a 1-D array when the file contains only one
-    temperature row (single-T run). ndmin=2 ensures the result is
-    always 2-D so write_kappa_tensor_vs_T can iterate over rows safely.
+    File columns: T(K)  k11  k12  k13  k21  k22  k23  k31  k32  k33
+                  (10 columns total: T + 9 tensor components)
 
     Parameters
     ----------
     base_dir : str
+        ShengBTE root directory.
     method : str
         'RTA', 'CONV', or 'sg'.
 
     Returns
     -------
     numpy.ndarray or None
-        Shape (n_temps, 7).
+        Shape (n_temps, 10).
     """
-    path = os.path.join(base_dir, f"BTE.KappaTensorVsT_{method}")
-    if not os.path.isfile(path):
-        print(f"  WARNING: 'BTE.KappaTensorVsT_{method}' not found — skipping.")
-        return None
-    return np.loadtxt(path, ndmin=2)
+    fname = f"BTE.KappaTensorVsT_{method}"
+    return _readcols(os.path.join(base_dir, fname), fname)
+
+
+# ===========================================================================
+# Temperature-dependent readers  (T*K/ subdirectories)
+# ===========================================================================
+
+def read_kappa_mode(temp_dir, n_modes):
+    """
+    Read per-mode kappa tensor from BTE.kappa.
+
+    BTE.kappa stores one row per mode per convergence iteration.
+    Only the last n_modes rows (final iteration) are returned.
+
+    File columns: band_index  k11  k12  k13  k21  k22  k23  k31  k32  k33
+      col0  = integer band index (used for blank-line separation in output)
+      cols 1-9 = full 3x3 kappa tensor in row-major order [W/(m K)]
+
+    Frequency axis is taken externally from BTE.omega.
+
+    Parameters
+    ----------
+    temp_dir : str
+        T*K subdirectory.
+    n_modes : int
+        Total number of phonon modes (n_qpoints * n_bands).
+
+    Returns
+    -------
+    tuple of (numpy.ndarray, numpy.ndarray) or (None, None)
+        (band_idx, tensor)
+        band_idx shape (n_modes,) int
+        tensor   shape (n_modes, 9)
+    """
+    data = _readcols(os.path.join(temp_dir, "BTE.kappa"), "BTE.kappa")
+    if data is None:
+        return None, None
+    data = data[-n_modes:]                     # last iteration only
+    return data[:, 0].astype(int), data[:, 1:]
+
+
+def read_scattering_rate(temp_dir, base_dir, fourphonon=False):
+    """
+    Read phonon scattering rates.
+
+    File columns (for all BTE.w* files): omega(rad/ps)  rate(ps-1)
+    Only the rate column (col1) is returned; the frequency axis is taken
+    externally from BTE.omega.
+
+    Files and their locations:
+      BTE.w              temp_dir   total RTA scattering rate
+      BTE.w_anharmonic   temp_dir   3ph contribution (3ph-only runs)
+      BTE.w_3ph          temp_dir   3ph contribution (FourPhonon runs)
+      BTE.w_isotopic     base_dir   isotopic contribution (temperature-independent)
+      BTE.w_final        temp_dir   total converged scattering rate
+
+    Parameters
+    ----------
+    temp_dir : str
+        T*K subdirectory.
+    base_dir : str
+        ShengBTE root directory (for BTE.w_isotopic).
+    fourphonon : bool
+        When True, read BTE.w_3ph instead of BTE.w_anharmonic.
+
+    Returns
+    -------
+    dict
+        'total'      -> ndarray (n_modes,) or None  [BTE.w]
+        'anharmonic' -> ndarray (n_modes,) or None  [BTE.w_anharmonic or BTE.w_3ph]
+        'isotopic'   -> ndarray (n_modes,) or None  [BTE.w_isotopic]
+        'final'      -> ndarray (n_modes,) or None  [BTE.w_final]
+        Units: ps-1.
+    """
+    def _rates(directory, fname):
+        """Return rate column (col1) from a 2-column scattering rate file."""
+        data = _readcols(os.path.join(directory, fname), fname)
+        return data[:, 1] if data is not None else None
+
+    anharmonic_file = "BTE.w_3ph" if fourphonon else "BTE.w_anharmonic"
+
+    return {
+        'total'      : _rates(temp_dir, "BTE.w"),
+        'anharmonic' : _rates(temp_dir, anharmonic_file),
+        'isotopic'   : _rates(base_dir, "BTE.w_isotopic"),
+        'final'      : _rates(temp_dir, "BTE.w_final"),
+    }
+
+
+def read_w4(temp_dir):
+    """
+    Read 4-phonon scattering rates from BTE.w_4ph (FourPhonon).
+
+    File columns: omega(rad/ps)  rate(ps-1)
+    Only the rate column (col1) is returned; the frequency axis is taken
+    externally from BTE.omega.
+
+    Parameters
+    ----------
+    temp_dir : str
+        T*K subdirectory.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        Scattering rates, shape (n_modes,), units ps-1.
+    """
+    data = _readcols(os.path.join(temp_dir, "BTE.w_4ph"), "BTE.w_4ph")
+    return data[:, 1] if data is not None else None
+
+
+def read_cumulative_kappa_mfp(temp_dir):
+    """
+    Read BTE.cumulative_kappa_tensor: cumulative kappa vs. mean free path.
+
+    File columns: mfp(nm)  k11  k12  k13  k21  k22  k23  k31  k32  k33
+                  (10 columns total)
+
+    Parameters
+    ----------
+    temp_dir : str
+
+    Returns
+    -------
+    numpy.ndarray or None
+        Shape (n_points, 10): col0=MFP(nm), cols 1-9 = 3x3 kappa tensor.
+    """
+    return _readcols(os.path.join(temp_dir, "BTE.cumulative_kappa_tensor"),
+                     "BTE.cumulative_kappa_tensor")
+
+
+def read_cumulative_kappa_freq(temp_dir):
+    """
+    Read BTE.cumulative_kappaVsOmega_tensor: cumulative kappa vs. frequency.
+
+    File columns: omega(rad/ps)  k11  k12  k13  k21  k22  k23  k31  k32  k33
+                  (10 columns total)
+
+    Parameters
+    ----------
+    temp_dir : str
+
+    Returns
+    -------
+    numpy.ndarray or None
+        Shape (n_points, 10): col0=omega(rad/ps), cols 1-9 = 3x3 kappa tensor.
+    """
+    return _readcols(os.path.join(temp_dir, "BTE.cumulative_kappaVsOmega_tensor"),
+                     "BTE.cumulative_kappaVsOmega_tensor")
 
 
 def write_kappa_tensor_vs_T(outpath, label, kappa_data):
@@ -567,22 +621,22 @@ def write_kappa_tensor_vs_T(outpath, label, kappa_data):
     outpath : str
     label : str
     kappa_data : numpy.ndarray
-        Shape (n_temps, 7): T(K) + kappa_xx...xy  [W/(m K)].
+        Shape (n_temps, 10): col0=T(K), cols 1-9 = 3x3 kappa tensor (row-major).
     """
     with open(outpath, 'w') as o:
         o.write(f"# {label}\n")
         o.write("# Units: W/(m K)\n")
         o.write(TENSOR_HEADER + "\n")
         for row in kappa_data:
-            o.write(f"{row[0]:>7.1f}" + _fmt6(row[1:7]) + "\n")
+            o.write(f"{row[0]:>7.1f}" + _fmt9(row[1:10]) + "\n")
         o.write("\n")
     print(f"  Written: {outpath}")
  
  
-def write_kappa_mode(outpath, label, freq_THz, kappa_mode_data):
+def write_kappa_mode(outpath, label, freq_THz, kappa_mode_data, band_indices=None):
     """
     Write mode-resolved thermal conductivity vs. frequency.
- 
+
     Parameters
     ----------
     outpath : str
@@ -590,19 +644,20 @@ def write_kappa_mode(outpath, label, freq_THz, kappa_mode_data):
     freq_THz : numpy.ndarray
         Shape (n_modes,).
     kappa_mode_data : numpy.ndarray
-        Shape (n_modes, 7): col0 = omega (replaced), cols 1-6 = kappa tensor.
+        Shape (n_modes, 9): full 3x3 kappa tensor per mode (row-major).
     """
     with open(outpath, 'w') as o:
         o.write(f"# {label}\n")
         o.write("# Units: W/(m K)\n")
         o.write(FREQ_HEADER + "\n")
-        for freq, row in zip(freq_THz, kappa_mode_data):
-            o.write(f"{freq:>16.6f}" + _fmt6(row[1:7]) + "\n")
+        rows = [f"{freq:>16.6f}" + _fmt9(row)
+                for freq, row in zip(freq_THz, kappa_mode_data)]
+        _write_blocks(o, rows, band_indices=band_indices)
         o.write("\n")
     print(f"  Written: {outpath}")
  
  
-def write_gruneisen(outpath, freq_THz, gruneisen):
+def write_gruneisen(outpath, freq_THz, gruneisen, band_indices=None):
     """
     Write Gruneisen parameters vs. frequency.
  
@@ -617,13 +672,14 @@ def write_gruneisen(outpath, freq_THz, gruneisen):
     with open(outpath, 'w') as o:
         o.write("# Gruneisen parameter per mode\n")
         o.write(GRUN_HEADER + "\n")
-        for freq, g in zip(freq_THz, gruneisen):
-            o.write(f"{freq:>16.6f}  {g:>14.6f}\n")
+        rows = [f"{freq:>16.6f}  {g:>14.6f}"
+                for freq, g in zip(freq_THz, gruneisen)]
+        _write_blocks(o, rows, band_indices=band_indices)
         o.write("\n")
     print(f"  Written: {outpath}")
  
  
-def write_scattering_rate(outpath, label, freq_THz, rates):
+def write_scattering_rate(outpath, label, freq_THz, rates, band_indices=None):
     """
     Write phonon scattering rates (Gamma) vs. frequency.
  
@@ -640,13 +696,14 @@ def write_scattering_rate(outpath, label, freq_THz, rates):
         o.write(f"# {label}\n")
         o.write("# Units: ps-1\n")
         o.write(GAMMA_HEADER + "\n")
-        for freq, g in zip(freq_THz, rates):
-            o.write(f"{freq:>16.6f}  {g:>14.6e}\n")
+        rows = [f"{freq:>16.6f}  {g:>14.6e}"
+                for freq, g in zip(freq_THz, rates)]
+        _write_blocks(o, rows, band_indices=band_indices)
         o.write("\n")
     print(f"  Written: {outpath}")
  
  
-def write_lifetime(outpath, label, freq_THz, rates):
+def write_lifetime(outpath, label, freq_THz, rates, band_indices=None):
     """
     Write phonon lifetimes (tau = 1/Gamma) vs. frequency.
  
@@ -666,9 +723,11 @@ def write_lifetime(outpath, label, freq_THz, rates):
         o.write(f"# {label}\n")
         o.write("# Units: ps\n")
         o.write(TAU_HEADER + "\n")
+        rows = []
         for freq, g in zip(freq_THz, rates):
             tau = 1.0 / g if g > 1e-30 else 0.0
-            o.write(f"{freq:>16.6f}  {tau:>14.6e}\n")
+            rows.append(f"{freq:>16.6f}  {tau:>14.6e}")
+        _write_blocks(o, rows, band_indices=band_indices)
         o.write("\n")
     print(f"  Written: {outpath}")
  
@@ -680,7 +739,7 @@ def _scalar_line(label, value):
     return f"# {label} = N/A\n"
  
  
-def write_phase_space_3ph(outpath, freq_THz, ps):
+def write_phase_space_3ph(outpath, freq_THz, ps, band_indices=None):
     """
     Write 3-phonon phase space vs. frequency.
  
@@ -716,13 +775,14 @@ def write_phase_space_3ph(outpath, freq_THz, ps):
         if ps['p3_plus']  is None: o.write("# WARNING: BTE.P3_plus not found — P3_plus column is zero-filled\n")
         if ps['p3_minus'] is None: o.write("# WARNING: BTE.P3_minus not found — P3_minus column is zero-filled\n")
         o.write(P3_HEADER + "\n")
-        for freq, tot, plus, minus in zip(freq_THz, p3_arr, pp_arr, pm_arr):
-            o.write(f"{freq:>16.6f}  {tot:>14.6e}  {plus:>14.6e}  {minus:>14.6e}\n")
+        rows = [f"{freq:>16.6f}  {tot:>14.6e}  {plus:>14.6e}  {minus:>14.6e}"
+                for freq, tot, plus, minus in zip(freq_THz, p3_arr, pp_arr, pm_arr)]
+        _write_blocks(o, rows, band_indices=band_indices)
         o.write("\n")
     print(f"  Written: {outpath}")
  
  
-def write_phase_space_4ph(outpath, freq_THz, ps):
+def write_phase_space_4ph(outpath, freq_THz, ps, band_indices=None):
     """
     Write 4-phonon phase space vs. frequency (FourPhonon).
  
@@ -764,8 +824,9 @@ def write_phase_space_4ph(outpath, freq_THz, ps):
         if ps['p4_plusminus']  is None: o.write("# WARNING: BTE.P4_plusminus not found — P4_plusminus column is zero-filled\n")
         if ps['p4_minusminus'] is None: o.write("# WARNING: BTE.P4_minusminus not found — P4_minusminus column is zero-filled\n")
         o.write(P4_HEADER + "\n")
-        for freq, tot, pp, pm, mm in zip(freq_THz, p4_arr, pp_arr, ppm_arr, mm_arr):
-            o.write(f"{freq:>16.6f}  {tot:>14.6e}  {pp:>14.6e}  {pm:>14.6e}  {mm:>14.6e}\n")
+        rows = [f"{freq:>16.6f}  {tot:>14.6e}  {pp:>14.6e}  {pm:>14.6e}  {mm:>14.6e}"
+                for freq, tot, pp, pm, mm in zip(freq_THz, p4_arr, pp_arr, ppm_arr, mm_arr)]
+        _write_blocks(o, rows, band_indices=band_indices)
         o.write("\n")
     print(f"  Written: {outpath}")
  
@@ -779,14 +840,14 @@ def write_cumulative_kappa_mfp(outpath, label, data):
     outpath : str
     label : str
     data : numpy.ndarray
-        Shape (n_points, 7): col0 = mfp(nm), cols 1-6 = kappa tensor.
+        Shape (n_points, 10): col0=mfp(nm), cols 1-9 = 3x3 kappa tensor (row-major).
     """
     with open(outpath, 'w') as o:
         o.write(f"# {label}\n")
         o.write("# Units: W/(m K)\n")
         o.write(MFP_HEADER + "\n")
         for row in data:
-            o.write(f"{row[0]:>16.4f}" + _fmt6(row[1:7]) + "\n")
+            o.write(f"{row[0]:>16.4f}" + _fmt9(row[1:10]) + "\n")
         o.write("\n")
     print(f"  Written: {outpath}")
  
@@ -802,19 +863,20 @@ def write_cumulative_kappa_freq(outpath, label, freq_THz, data):
     freq_THz : numpy.ndarray
         Shape (n_points,).
     data : numpy.ndarray
-        Shape (n_points, 7): col0 = omega(rad/ps) replaced by freq_THz.
+        Shape (n_points, 10): col0=omega(rad/ps), cols 1-9 = 3x3 kappa tensor (row-major).
     """
     with open(outpath, 'w') as o:
         o.write(f"# {label}\n")
         o.write("# Units: W/(m K)\n")
         o.write(FREQ_HEADER + "\n")
         for freq, row in zip(freq_THz, data):
-            o.write(f"{freq:>16.6f}" + _fmt6(row[1:7]) + "\n")
+            o.write(f"{freq:>16.6f}" + _fmt9(row[1:10]) + "\n")
         o.write("\n")
     print(f"  Written: {outpath}")
 
 
-def process_temperature(temp_K, temp_dir, base_dir, fourphonon, freq=None):
+def process_temperature(temp_K, temp_dir, base_dir, fourphonon,
+                        freq=None):
     """
     Extract all available ShengBTE (and FourPhonon) quantities for one
     temperature and write the corresponding .dat files.
@@ -832,8 +894,8 @@ def process_temperature(temp_K, temp_dir, base_dir, fourphonon, freq=None):
         Whether FourPhonon output was detected.
     freq : numpy.ndarray or None, optional
         Pre-computed frequency array (THz). When provided, BTE.omega is not
-        re-read for this temperature. Used by main() to avoid reading the
-        first temperature's BTE.omega twice.
+        re-read for this temperature.
+
 
     Notes
     -----
@@ -853,32 +915,35 @@ def process_temperature(temp_K, temp_dir, base_dir, fourphonon, freq=None):
     # --------------------------------------------------- mode kappa (per band)
     # BTE.kappa contains per-band contributions; single file for both 3ph and
     # 3ph+4ph runs — labelled accordingly based on fourphonon flag.
-    kappa_mode = read_kappa_mode(temp_dir)
+    band_idx_kappa = read_band_idx(base_dir)
+    _, kappa_mode  = read_kappa_mode(
+        temp_dir, n_modes=len(freq) if freq is not None else 0)
     if kappa_mode is not None:
-        label = f"Mode kappa (3ph+4ph RTA) at {temp_K} K" if fourphonon                 else f"Mode kappa (3ph RTA) at {temp_K} K"
+        label = f"Mode kappa (3ph+4ph RTA) at {temp_K} K" if fourphonon \
+                else f"Mode kappa (3ph RTA) at {temp_K} K"
         fname = "kappa_mode_4ph.dat" if fourphonon else "kappa_mode.dat"
         write_kappa_mode(
             os.path.join(temp_dir, fname),
-            label, freq, kappa_mode)
- 
+            label, freq, kappa_mode, band_indices=band_idx_kappa)
     # ------------------------------------------------------------ Gruneisen
     gruneisen = read_gruneisen(base_dir)
     if gruneisen is not None:
         write_gruneisen(
             os.path.join(temp_dir, "gruneisen.dat"),
-            freq, gruneisen)
+            freq, gruneisen, band_indices=band_idx_kappa)
  
     # ----------------------------------------- 3ph scattering rate & lifetime
-    rates_3ph = read_scattering_rate(temp_dir, fourphonon=fourphonon)
+    rates_dict_3ph = read_scattering_rate(temp_dir, base_dir, fourphonon=fourphonon)
+    rates_3ph = rates_dict_3ph['total']
     if rates_3ph is not None:
         write_scattering_rate(
             os.path.join(temp_dir, "scattering_rate_3ph.dat"),
             f"3-phonon scattering rate Gamma at {temp_K} K",
-            freq, rates_3ph)
+            freq_3ph, rates_3ph)
         write_lifetime(
             os.path.join(temp_dir, "lifetime_3ph.dat"),
             f"3-phonon lifetime at {temp_K} K",
-            freq, rates_3ph)
+            freq_3ph, rates_3ph)
  
     # ----------------------------------------- 4ph scattering rate & lifetime
     if fourphonon:
@@ -887,11 +952,11 @@ def process_temperature(temp_K, temp_dir, base_dir, fourphonon, freq=None):
             write_scattering_rate(
                 os.path.join(temp_dir, "scattering_rate_4ph.dat"),
                 f"4-phonon scattering rate Gamma at {temp_K} K",
-                freq, rates_4ph)
+                freq_4ph, rates_4ph)
             write_lifetime(
                 os.path.join(temp_dir, "lifetime_4ph.dat"),
                 f"4-phonon lifetime at {temp_K} K",
-                freq, rates_4ph)
+                freq, rates_4ph, band_indices=band_idx_kappa)
  
     # ----------------------------------------- cumulative kappa vs. MFP
     cum_mfp = read_cumulative_kappa_mfp(temp_dir)
@@ -900,7 +965,6 @@ def process_temperature(temp_K, temp_dir, base_dir, fourphonon, freq=None):
             os.path.join(temp_dir, "cumulative_kappa_mfp.dat"),
             f"Cumulative kappa vs. MFP at {temp_K} K",
             cum_mfp)
- 
     # ----------------------------------------- cumulative kappa vs. frequency
     cum_freq_data = read_cumulative_kappa_freq(temp_dir)
     if cum_freq_data is not None:
@@ -950,18 +1014,20 @@ def main():
     omega_ref  = read_omega(base_dir)
     if omega_ref is not None:
         freq_ref = _to_THz(omega_ref)
+        # Band index from BTE.omega shape — same ordering as all per-mode files
+        band_idx_kappa_ref = read_band_idx(base_dir)
         ps3 = read_phase_space_3ph(base_dir)
         if any(ps3[k] is not None for k in ('p3', 'p3_plus', 'p3_minus')):
             write_phase_space_3ph(
                 os.path.join(base_dir, "phase_space_3ph.dat"),
-                freq_ref, ps3)
+                freq_ref, ps3, band_indices=band_idx_kappa_ref)
         if fourphonon:
             ps4 = read_phase_space_4ph(base_dir)
             if any(ps4[k] is not None for k in ('p4', 'p4_plusplus',
                                                  'p4_plusminus', 'p4_minusminus')):
                 write_phase_space_4ph(
                     os.path.join(base_dir, "phase_space_4ph.dat"),
-                    freq_ref, ps4)
+                    freq_ref, ps4, band_indices=band_idx_kappa_ref)
     else:
         print("  WARNING: BTE.omega not found — phase space output skipped.")
  
