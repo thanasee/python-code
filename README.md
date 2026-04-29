@@ -101,6 +101,7 @@ Usage: compareIFCs.py <DFT's force constants HDF5 input> <MLFF's force constants
 ---
 
 #### `analyzeShengBTE.py`
+*in developing*
 
 Extracts thermal transport properties from [ShengBTE](https://www.shengbte.org/) output files and writes them to `.dat` files suitable for plotting in xmgrace or matplotlib. [FourPhonon](https://github.com/FourPhonon/FourPhonon) four-phonon scattering quantities are auto-detected and extracted when present. Run from the ShengBTE output directory; no arguments are required.
 
@@ -108,7 +109,7 @@ Extracts thermal transport properties from [ShengBTE](https://www.shengbte.org/)
 Usage: analyzeShengBTE.py
 ```
 
-Temperature subdirectories (`T<int>K/`) are detected automatically from the working directory. If more than one temperature is found, an interactive prompt asks which temperature(s) to process. FourPhonon is detected by the presence of `BTE.w4_*` or `BTE.P4` files inside any `T-<int>K/` subdirectory.
+Temperature subdirectories (`T<int>K/`) are detected automatically from the working directory. If more than one temperature is found, an interactive prompt asks which temperature(s) to process. FourPhonon is detected by the presence of `BTE.w4_*` or `BTE.P4` files inside any `T<int>K/` subdirectory.
 
 All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/(m·K).
 
