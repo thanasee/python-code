@@ -138,7 +138,7 @@ def compute_kappa_variant(mode_kappa, weight, temperature, frequency, mean_freep
 
     branch = np.concatenate((
         mk_weight.sum(axis=1)[:, :3, :],
-        mk_weight.sum(axis=1)[:, 3:, :].sum(axis=1)[:, np.newaxis, :]
+        mk_weight.sum(axis=1)[:, 3:, :].sum(axis=1, keepdims=True)
     ), axis=1)
 
     freq_order = np.argsort(frequency.flatten())
@@ -160,7 +160,7 @@ def compute_kappa_variant(mode_kappa, weight, temperature, frequency, mean_freep
         nan=0.0)
     contrib = np.concatenate((
         contrib_all[:, :3, :],
-        contrib_all[:, 3:, :].sum(axis=1)[:, np.newaxis, :]
+        contrib_all[:, 3:, :].sum(axis=1, keepdims=True)
     ), axis=1)
 
     return mk_weight, branch, cum_freq, deriv_freq, cum_mfp, deriv_mfp, contrib_all, contrib
