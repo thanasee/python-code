@@ -101,37 +101,74 @@ Usage: compareIFCs.py <DFT's force constants HDF5 input> <MLFF's force constants
 ---
 
 #### `analyzeShengBTE.py`
-*in developing*
 
-Extracts thermal transport properties from [ShengBTE](https://www.shengbte.org/) output files and writes them to `.dat` files suitable for plotting in xmgrace or matplotlib. [FourPhonon](https://github.com/FourPhonon/FourPhonon) four-phonon scattering quantities are auto-detected and extracted when present. Run from the ShengBTE output directory; no arguments are required.
+Extracts thermal transport properties from [ShengBTE](https://www.shengbte.org/) output files and writes them to `.dat` files suitable for plotting in xmgrace or matplotlib. Run from the ShengBTE output directory. The single required argument selects whether to include [FourPhonon](https://github.com/FourPhonon/FourPhonon) four-phonon scattering quantities.
 
 ```
-Usage: analyzeShengBTE.py
+Usage: analyzeShengBTE.py <3ph/4ph>
 ```
 
-Temperature subdirectories (`T<int>K/`) are detected automatically from the working directory. If more than one temperature is found, an interactive prompt asks which temperature(s) to process. FourPhonon is detected by the presence of `BTE.w4_*` or `BTE.P4` files inside any `T<int>K/` subdirectory.
+`3ph` processes 3-phonon quantities only. `4ph` additionally reads all FourPhonon output files (`BTE.w4_*`, `BTE.P4*`, `BTE.WP4*`). Temperature subdirectories (`T<N>K/`) are detected automatically from the working directory.
 
-All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/(m·K).
-
-**Temperature-dependent files** (one value per temperature row, written to the working directory):
-- `kappa_tensor_RTA.dat` — total κ tensor vs. temperature (3-phonon RTA)
-- `kappa_tensor_CONV.dat` — total κ tensor vs. temperature (iterative solution, if available)
-- `kappa_tensor_4ph.dat` — total κ tensor vs. temperature (3ph+4ph RTA) *[FourPhonon only]*
-
-**Per-temperature spectral files** (written into each selected `T<int>K/` subdirectory):
-- `kappa_mode.dat` — mode κ vs. phonon frequency (THz), 3-phonon RTA
-- `kappa_mode_4ph.dat` — mode κ vs. frequency, 3ph+4ph RTA *[FourPhonon only]*
-- `gruneisen.dat` — Grüneisen parameter vs. frequency
-- `scattering_rate_3ph.dat` — 3-phonon scattering rate Γ (ps^-1) vs. frequency
-- `lifetime_3ph.dat` — 3-phonon phonon lifetime τ (ps) vs. frequency
-- `scattering_rate_4ph.dat` — 4-phonon scattering rate Γ (ps^-1) vs. frequency *[FourPhonon only]*
-- `lifetime_4ph.dat` — 4-phonon phonon lifetime τ (ps) vs. frequency *[FourPhonon only]*
-- `cumulative_kappa_mfp.dat` — cumulative κ vs. mean free path (nm)
-- `cumulative_kappa_freq.dat` — cumulative κ vs. phonon frequency (THz)
+All κ tensor components are written as the full 3×3 tensor (xx, xy, xz, yx, yy, yz, zx, zy, zz) in W/(m·K). All scattering files are written per phonon branch. Phonon lifetimes are computed as τ = 1/(2 × 2π × Γ) (ps); modes with Γ ≤ 0 are assigned τ = 0.
 
 **Temperature-independent files** (written to the working directory):
-- `phase_space_3ph.dat` — 3-phonon phase space P3 (absorption + emission) vs. frequency; file header records the scalar totals P3\_total, P3\_plus\_total, P3\_minus\_total
-- `phase_space_4ph.dat` — 4-phonon phase space P4 (++, +−, −−) vs. frequency; header records P4\_total and each process-type total *[FourPhonon only]*
+
+*κ vs. temperature:*
+- `Kappa_RTAVsT.dat` — total κ tensor vs. temperature, RTA solution
+- `Kappa_CONVVsT.dat` — total κ tensor vs. temperature, iterative (CONV) solution
+- `Kappa_bandVsT.dat` — κ tensor decomposed into 3 acoustic branches + 1 summed optical branch vs. temperature
+
+*Phonon properties (frequency-resolved):*
+- `GroupVelocityVsFrequency.dat` — group velocity vector (vx, vy, vz) in km/s vs. frequency (THz)
+- `GroupVelocityAmplitudeVsFrequency.dat` — group velocity amplitude |v| in km/s vs. frequency (THz)
+- `GruneisenVsFrequency.dat` — Grüneisen parameter vs. frequency (THz)
+- `ScatteringRate_IsotopicVsFrequency.dat` — isotope scattering rate Γ (ps^-1) vs. frequency (THz)
+- `Lifetime_IsotopicVsFrequency.dat` — isotope phonon lifetime τ (ps) vs. frequency (THz)
+
+*Heat capacity:*
+- `HeatCapacityVsT.dat` — total heat capacity Cv (eV/K) vs. temperature
+
+*3-phonon phase space (written to working directory):*
+- `P3VsFrequency.dat` — total P3 (absorption + emission) vs. frequency; header records scalar `P3_total`
+- `P3_AdsorptionVsFrequency.dat` — P3+ (absorption) vs. frequency; header records `P3_plus_total`
+- `P3_EmissionVsFrequency.dat` — P3- (emission) vs. frequency; header records `P3_minus_total`
+
+*4-phonon phase space *[FourPhonon only]*:*
+- `P4VsFrequency.dat` — total P4 vs. frequency; header records scalar `P4_total`
+- `P4_RecombinationVsFrequency.dat` — P4++ (recombination) vs. frequency
+- `P4_RedistributionVsFrequency.dat` — P4+- (redistribution) vs. frequency
+- `P4_SplittingVsFrequency.dat` — P4-- (splitting) vs. frequency
+
+**Per-temperature files** (written into each `T<N>K/` subdirectory):
+
+*Cumulative κ:*
+- `CumulativeKappaVsMFP.dat` — cumulative κ tensor vs. mean free path (Å)
+- `CumulativeKappaVsFrequency.dat` — cumulative κ tensor vs. frequency (THz)
+
+*3-phonon scattering rates and lifetimes:*
+- `ScatteringRate_3phVsFrequency.dat` / `Lifetime_3phVsFrequency.dat` — total 3ph Γ and τ
+- `ScatteringRate_3ph_AdsorptionVsFrequency.dat` / `Lifetime_3ph_AdsorptionVsFrequency.dat` — 3ph absorption process
+- `ScatteringRate_3ph_EmissionVsFrequency.dat` / `Lifetime_3ph_EmissionVsFrequency.dat` — 3ph emission process
+
+*Combined scattering rates and lifetimes (3ph + isotope, or 3ph + 4ph + isotope):*
+- `ScatteringRateVsFrequency.dat` / `LifetimeVsFrequency.dat` — total combined Γ and τ (from `BTE.w`)
+- `ScatteringRateFinalVsFrequency.dat` / `LifetimeFinalVsFrequency.dat` — final iterative Γ and τ (from `BTE.w_final`)
+
+*3-phonon weighted phase space:*
+- `WeightedPhaseSpace_3phVsFrequency.dat` — total WP3 vs. frequency
+- `WeightedPhaseSpace_3ph_AdsorptionVsFrequency.dat` — WP3+ vs. frequency
+- `WeightedPhaseSpace_3ph_EmissionVsFrequency.dat` — WP3- vs. frequency
+
+*4-phonon scattering rates, lifetimes, and weighted phase space *[FourPhonon only]*:*
+- `ScatteringRate_4phVsFrequency.dat` / `Lifetime_4phVsFrequency.dat` — total 4ph Γ and τ
+- `ScatteringRate_4ph_RecombinationVsFrequency.dat` / `Lifetime_4ph_RecombinationVsFrequency.dat`
+- `ScatteringRate_4ph_RedistributionVsFrequency.dat` / `Lifetime_4ph_RedistributionVsFrequency.dat`
+- `ScatteringRate_4ph_SplittingVsFrequency.dat` / `Lifetime_4ph_SplittingVsFrequency.dat`
+- `WeightedPhaseSpace_4phVsFrequency.dat` — total WP4 vs. frequency
+- `WeightedPhaseSpace_4ph_RecombinationVsFrequency.dat` — WP4++ vs. frequency
+- `WeightedPhaseSpace_4ph_RedistributionVsFrequency.dat` — WP4+- vs. frequency
+- `WeightedPhaseSpace_4ph_SplittingVsFrequency.dat` — WP4-- vs. frequency
 
 ---
 
