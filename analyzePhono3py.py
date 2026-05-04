@@ -256,7 +256,7 @@ def write_mode_vs_frequency(filepath, frequency, mode_weight, temp_index):
             o.write(FREQ_HEADER + "\n")
             for freq, k in zip(frequency[:, band_index],
                                mode_weight[temp_index, :, band_index, :]):
-                o.write(f" {freq:>10.5f}  {k[0]:>12.5f}  {k[1]:>12.5f}  {k[2]:>12.4f}  {k[3]:>12.5f}  {k[4]:>12.5f}  {k[5]:>12.5f}\n")
+                o.write(f" {freq:>10.5f}  {k[0]:>12.3f}  {k[1]:>12.3f}  {k[2]:>12.3f}  {k[3]:>12.3f}  {k[4]:>12.3f}  {k[5]:>12.3f}\n")
         o.write("\n")
 
 
@@ -281,7 +281,7 @@ def write_mode_vs_mfp(filepath, mean_freepath, mode_weight, temp_index):
             o.write(MFP_HEADER + "\n")
             for mfp, k in zip(mean_freepath[temp_index, :, band_index],
                               mode_weight[temp_index, :, band_index, :]):
-                o.write(f" {mfp:>14.4f}  {k[0]:>12.5f}  {k[1]:>12.5f}  {k[2]:>12.5f}  {k[3]:>12.5f}  {k[4]:>12.5f}  {k[5]:>12.5f}\n")
+                o.write(f" {mfp:>14.4f}  {k[0]:>12.3f}  {k[1]:>12.3f}  {k[2]:>12.3f}  {k[3]:>12.3f}  {k[4]:>12.3f}  {k[5]:>12.3f}\n")
         o.write("\n")
 
 
@@ -306,7 +306,7 @@ def write_nomode_vs_frequency(filepath, sorted_frequency, data, temp_index):
         o.write("# Thermal conductivity(W/m-K) vs Frequency\n")
         o.write(FREQ_HEADER + "\n")
         for freq, k in zip(sorted_frequency, data[temp_index]):
-            o.write(f" {freq:>10.5f}  {k[0]:>12.5f}  {k[1]:>12.5f}  {k[2]:>12.5f}  {k[3]:>12.5f}  {k[4]:>12.5f}  {k[5]:>12.5f}\n")
+            o.write(f" {freq:>10.5f}  {k[0]:>12.3f}  {k[1]:>12.3f}  {k[2]:>12.3f}  {k[3]:>12.3f}  {k[4]:>12.3f}  {k[5]:>12.3f}\n")
         o.write("\n")
 
 
@@ -331,7 +331,7 @@ def write_nomode_vs_mfp(filepath, sorted_mfp, data, temp_index):
         o.write("# Thermal conductivity(W/m-K) vs Mean free path\n")
         o.write(MFP_HEADER + "\n")
         for mfp, k in zip(sorted_mfp[temp_index], data[temp_index]):
-            o.write(f" {mfp:>14.4f}  {k[0]:>12.5f}  {k[1]:>12.5f}  {k[2]:>12.5f}  {k[3]:>12.5f}  {k[4]:>12.5f}  {k[5]:>12.5f}\n")
+            o.write(f" {mfp:>14.4f}  {k[0]:>12.3f}  {k[1]:>12.3f}  {k[2]:>12.3f}  {k[3]:>12.3f}  {k[4]:>12.3f}  {k[5]:>12.3f}\n")
         o.write("\n")
 
 
@@ -402,7 +402,7 @@ def write_group_velocity(filepath, frequency, group_velocity):
         Group velocity Cartesian components in THz·Å.
     """
     with open(filepath, 'w') as o:
-        o.write("# Group Velocity(THz * A) vs Frequency\n")
+        o.write("# Group Velocity(km/s) vs Frequency\n")
         for band_index in range(frequency.shape[1]):
             o.write(f"\n# Band-Index: {band_index + 1}\n")
             o.write(GV_HEADER + "\n")
@@ -427,7 +427,7 @@ def write_group_velocity_amplitude(filepath, frequency, group_velocity_amp):
         Group velocity amplitude |v| = norm(vx, vy, vz) in THz·Å.
     """
     with open(filepath, 'w') as o:
-        o.write("# Group Velocity amplitude(THz * A) vs Frequency\n")
+        o.write("# Group Velocity amplitude(km/s) vs Frequency\n")
         for band_index in range(frequency.shape[1]):
             o.write(f"\n# Band-Index: {band_index + 1}\n")
             o.write(GV_AMP_HEADER + "\n")
@@ -987,7 +987,7 @@ def main():
     with h5.File(kappa_input_file, 'r') as f:
         frequency             = read_kappa(f, "frequency")
         gamma                 = read_kappa(f, "gamma")
-        group_velocity        = read_kappa(f, "group_velocity")
+        group_velocity        = read_kappa(f, "group_velocity") * 1e-1 # THz * Å -> THz * nm
         gv_by_gv              = read_kappa(f, "gv_by_gv")
         heat_capacity         = read_kappa(f, "heat_capacity")
         mesh                  = read_kappa(f, "mesh")
