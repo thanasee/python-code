@@ -31,7 +31,23 @@ CV_HEADER         = "#  T(K)    Cv(eV/K)"
 
 
 def _read_file(filepath):
-    
+    """Read a whitespace-delimited numeric file into a NumPy array.
+ 
+    Uses np.loadtxt for parsing. Returns a Python scalar via .item() if
+    the file contains exactly one value (e.g. BTE.P3_total), otherwise
+    returns the full 2-D array.
+ 
+    Parameters
+    ----------
+    filepath : str
+        Path to the file.
+ 
+    Returns
+    -------
+    float or ndarray
+        Scalar float if file contains one value; otherwise ndarray,
+        shape (nrows, ncols).
+    """
     if not os.path.exists(filepath):
         print(f"ERROR!\nFile: {filepath} does not exist.")
         exit(1)
@@ -42,12 +58,36 @@ def _read_file(filepath):
 
 
 def _to_THz(omega):
-    
+    """Convert angular frequency ω (rad/ps) to ordinary frequency ν (THz).
+ 
+    Parameters
+    ----------
+    omega : ndarray
+        Angular frequencies in rad/ps.
+ 
+    Returns
+    -------
+    ndarray
+        Frequencies in THz.
+    """
     return omega / (2 * np.pi)
 
 
 def read_kappa_vs_temperature(filepath):
-    
+    """Read BTE.KappaTensorVsT_RTA or BTE.KappaTensorVsT_CONV.
+ 
+    Parameters
+    ----------
+    filepath : str
+        Path to the file.
+ 
+    Returns
+    -------
+    temperature : ndarray, shape (nT,)
+        Temperature values in K.
+    kappa : ndarray, shape (nT, 9)
+        Full 3×3 κ tensor components (xx xy xz yx yy yz zx zy zz) in W/m-K.
+    """
     lines = _read_file(filepath)
     temperature = lines[:, 0]
     kappa = lines[:, 1:10]
@@ -56,7 +96,17 @@ def read_kappa_vs_temperature(filepath):
 
 
 def write_kappa_vs_temperature(filepath, temperature, kappa):
-    
+    """Write κ tensor (all 9 components) vs temperature.
+ 
+    Parameters
+    ----------
+    filepath    : str
+        Output file path.
+    temperature : ndarray, shape (nT,)
+        Temperature values in K.
+    kappa       : ndarray, shape (nT, 9)
+        Tensor components (xx xy xz yx yy yz zx zy zz) in W/m-K.
+    """
     with open(filepath, 'w') as o:
         o.write("# Thermal conductivity(W/m-K) vs Temperature\n")
         o.write(TENSOR_HEADER + "\n")
@@ -68,7 +118,22 @@ def write_kappa_vs_temperature(filepath, temperature, kappa):
 
 
 def read_frequency(filepath):
-    
+    """Read BTE.omega and convert from rad/ps to THz.
+ 
+    Parameters
+    ----------
+    filepath : str
+        Path to BTE.omega.
+ 
+    Returns
+    -------
+    frequency : ndarray, shape (nQpt, nBand)
+        Phonon frequencies in THz.
+    n_qpoints : int
+        Number of q-points.
+    n_bands : int
+        Number of phonon branches.
+    """
     omega = _read_file(filepath)
     n_qpoints, n_bands = omega.shape
     frequency = _to_THz(omega)
@@ -77,7 +142,18 @@ def read_frequency(filepath):
 
 
 def read_qpoints(filepath):
-    
+    """Read BTE.qpoints and return the number of q-points.
+ 
+    Parameters
+    ----------
+    filepath : str
+        Path to BTE.qpoints.
+ 
+    Returns
+    -------
+    n_qpoints : int
+        Number of q-points (number of data rows).
+    """
     lines = _read_file(filepath)
     n_qpoints = lines.shape[0]
     
@@ -85,7 +161,20 @@ def read_qpoints(filepath):
 
 
 def read_gruneisen(filepath):
-    
+    """Read BTE.gruneisen.
+ 
+    Parameters
+    ----------
+    filepath : str
+        Path to BTE.gruneisen.
+ 
+    Returns
+    -------
+    gruneisen : ndarray, shape (nQpt, nBand)
+        Mode Grüneisen parameters (dimensionless).
+    n_qpoints : int
+    n_bands   : int
+    """
     gruneisen = _read_file(filepath)
     n_qpoints, n_bands = gruneisen.shape
     
@@ -93,7 +182,19 @@ def read_gruneisen(filepath):
 
 
 def write_gruneisen_vs_frequency(filepath, frequency, n_bands, gruneisen):
-    
+    """Write Grüneisen parameter vs frequency, per band.
+ 
+    Parameters
+    ----------
+    filepath  : str
+        Output file path.
+    frequency : ndarray, shape (nQpt, nBand)
+        Phonon frequencies in THz.
+    n_bands   : int
+        Number of phonon branches.
+    gruneisen : ndarray, shape (nQpt, nBand)
+        Mode Grüneisen parameters (dimensionless).
+    """
     with open(filepath, 'w') as o:
         o.write("# Gruneisen parameter vs Frequency\n")
         for band_index in range(n_bands):
@@ -105,7 +206,24 @@ def write_gruneisen_vs_frequency(filepath, frequency, n_bands, gruneisen):
 
 
 def read_group_velocity(filepath, n_qpoints, n_bands):
-    
+    """Read BTE.v and reshape into per-mode Cartesian vectors.
+ 
+    Parameters
+    ----------
+    filepath  : str
+        Path to BTE.v.
+    n_qpoints : int
+        Number of q-points.
+    n_bands   : int
+        Number of phonon branches.
+ 
+    Returns
+    -------
+    group_velocity : ndarray, shape (nQpt, nBand, 3)
+        Group velocity Cartesian components in km/s.
+    group_velocity_amp : ndarray, shape (nQpt, nBand)
+        Group velocity amplitude |v| in km/s.
+    """
     lines = _read_file(filepath)
     group_velocity = lines.reshape(n_qpoints, n_bands, 3)
     group_velocity_amp = np.linalg.norm(group_velocity, axis=-1)
@@ -114,7 +232,19 @@ def read_group_velocity(filepath, n_qpoints, n_bands):
 
 
 def write_group_velocity_vs_frequency(filepath, frequency, n_bands, group_velocity):
-    
+    """Write phonon group velocity vector (vx, vy, vz) vs frequency, per band.
+ 
+    Parameters
+    ----------
+    filepath       : str
+        Output file path.
+    frequency      : ndarray, shape (nQpt, nBand)
+        Phonon frequencies in THz.
+    n_bands        : int
+        Number of phonon branches.
+    group_velocity : ndarray, shape (nQpt, nBand, 3)
+        Group velocity Cartesian components in km/s.
+    """
     with open(filepath, 'w') as o:
         o.write("# Group Velocity(km/s) vs Frequency\n")
         for band_index in range(n_bands):
@@ -127,7 +257,19 @@ def write_group_velocity_vs_frequency(filepath, frequency, n_bands, group_veloci
 
 
 def write_group_velocity_amplitude_vs_frequency(filepath, frequency, n_bands, group_velocity_amp):
-    
+    """Write phonon group velocity amplitude |v| vs frequency, per band.
+ 
+    Parameters
+    ----------
+    filepath           : str
+        Output file path.
+    frequency          : ndarray, shape (nQpt, nBand)
+        Phonon frequencies in THz.
+    n_bands            : int
+        Number of phonon branches.
+    group_velocity_amp : ndarray, shape (nQpt, nBand)
+        Group velocity amplitude in km/s.
+    """
     with open(filepath, 'w') as o:
         o.write("# Group Velocity amplitude(km/s) vs Frequency\n")
         for band_index in range(n_bands):
@@ -140,7 +282,23 @@ def write_group_velocity_amplitude_vs_frequency(filepath, frequency, n_bands, gr
 
 
 def read_phase_space(filepath):
-    
+    """Read a phase-space file (BTE.P3, BTE.P3_plus, BTE.P3_minus, etc.)
+    and its corresponding *_total file.
+ 
+    Parameters
+    ----------
+    filepath : str
+        Path to the phase-space file (without '_total' suffix).
+ 
+    Returns
+    -------
+    phase_space       : ndarray, shape (nQpt, nBand)
+        Per-mode phase space values.
+    total_phase_space : float
+        Scalar total phase space (from *_total file).
+    n_qpoints         : int
+    n_bands           : int
+    """
     phase_space = _read_file(filepath)
     total_phase_space = _read_file(filepath + "_total")
     n_qpoints, n_bands = phase_space.shape
@@ -149,7 +307,23 @@ def read_phase_space(filepath):
 
 
 def write_phase_space_vs_frequency(filepath, frequency, n_bands, phase_space, total_phase_space):
-    
+    """Write phase space vs frequency, per band.
+ 
+    The scalar total phase space is written in the file header.
+ 
+    Parameters
+    ----------
+    filepath          : str
+        Output file path.
+    frequency         : ndarray, shape (nQpt, nBand)
+        Phonon frequencies in THz.
+    n_bands           : int
+        Number of phonon branches.
+    phase_space       : ndarray, shape (nQpt, nBand)
+        Per-mode phase space values.
+    total_phase_space : float
+        Scalar total phase space (from *_total file).
+    """
     with open(filepath, 'w') as o:
         o.write(f"# Phase space vs Frequency\n")
         o.write(f"# Total phase space is {total_phase_space:>14.4e}\n")
@@ -162,7 +336,22 @@ def write_phase_space_vs_frequency(filepath, frequency, n_bands, phase_space, to
 
 
 def read_weighted_phase_space(filepath, n_qpoints, n_bands):
-    
+    """Read a weighted phase-space file (BTE.WP3, BTE.WP3_plus, etc.).
+ 
+    Parameters
+    ----------
+    filepath  : str
+        Path to the weighted phase-space file.
+    n_qpoints : int
+    n_bands   : int
+ 
+    Returns
+    -------
+    frequency            : ndarray, shape (nQpt, nBand)
+        Phonon frequencies in THz.
+    weighted_phase_space : ndarray, shape (nQpt, nBand)
+        Weighted phase space values.
+    """
     lines = _read_file(filepath)
     omega = lines[:, 0].reshape(n_qpoints, n_bands)
     weighted_phase_space = lines[:, 1].reshape(n_qpoints, n_bands)
@@ -172,7 +361,19 @@ def read_weighted_phase_space(filepath, n_qpoints, n_bands):
 
 
 def write_weighted_phase_space_vs_frequency(filepath, frequency, n_bands, weighted_phase_space):
-    
+    """Write weighted phase space vs frequency, per band.
+ 
+    Parameters
+    ----------
+    filepath             : str
+        Output file path.
+    frequency            : ndarray, shape (nQpt, nBand)
+        Phonon frequencies in THz.
+    n_bands              : int
+        Number of phonon branches.
+    weighted_phase_space : ndarray, shape (nQpt, nBand)
+        Weighted phase space values.
+    """
     with open(filepath, 'w') as o:
         o.write(f"# Weighted phase space vs Frequency\n")
         for band_index in range(n_bands):
@@ -184,7 +385,25 @@ def write_weighted_phase_space_vs_frequency(filepath, frequency, n_bands, weight
 
 
 def read_scattering_rate(filepath, n_qpoints, n_bands):
-    
+    """Read a per-mode scattering rate file (BTE.w, BTE.w_final, etc.).
+ 
+    The file contains two columns per mode: ω (rad/ps) and Γ (ps⁻¹).
+    The flattened layout is (nQpt × nBand) rows.
+ 
+    Parameters
+    ----------
+    filepath  : str
+        Path to the scattering rate file.
+    n_qpoints : int
+    n_bands   : int
+ 
+    Returns
+    -------
+    frequency : ndarray, shape (nQpt, nBand)
+        Phonon frequencies in THz.
+    gamma     : ndarray, shape (nQpt, nBand)
+        Scattering rates (linewidths) in ps⁻¹.
+    """
     lines = _read_file(filepath)
     omega = lines[:, 0].reshape(n_qpoints, n_bands)
     gamma = lines[:, 1].reshape(n_qpoints, n_bands)
@@ -194,7 +413,19 @@ def read_scattering_rate(filepath, n_qpoints, n_bands):
 
 
 def write_scattering_rate_vs_frequency(filepath, frequency, n_bands, gamma):
-    
+    """Write anharmonic scattering rate Γ vs frequency, per band.
+ 
+    Parameters
+    ----------
+    filepath  : str
+        Output file path.
+    frequency : ndarray, shape (nQpt, nBand)
+        Phonon frequencies in THz.
+    n_bands   : int
+        Number of phonon branches.
+    gamma     : ndarray, shape (nQpt, nBand)
+        Scattering rates in ps⁻¹.
+    """
     with open(filepath, 'w') as o:
         o.write(f"# Scattering rate vs Frequency\n")
         for band_index in range(n_bands):
@@ -206,7 +437,22 @@ def write_scattering_rate_vs_frequency(filepath, frequency, n_bands, gamma):
 
 
 def compute_lifetime(gamma):
-    
+    """Compute phonon lifetime τ from linewidth Γ.
+ 
+    τ = 1 / (2 × 2π × Γ)   [ps]
+ 
+    Modes with Γ ≤ 0 are assigned τ = 0 to avoid division by zero.
+ 
+    Parameters
+    ----------
+    gamma : ndarray
+        Scattering rates (linewidths) in ps⁻¹.
+ 
+    Returns
+    -------
+    ndarray
+        Phonon lifetimes in ps.
+    """
     with np.errstate(divide='ignore'):
         tau = np.where(gamma > 0.0, 1.0 / (2.0 * 2.0 * np.pi * gamma), 0.0)
     
@@ -214,7 +460,19 @@ def compute_lifetime(gamma):
 
 
 def write_lifetime_vs_frequency(filepath, frequency, n_bands, tau):
-    
+    """Write phonon lifetime τ vs frequency, per band.
+ 
+    Parameters
+    ----------
+    filepath  : str
+        Output file path.
+    frequency : ndarray, shape (nQpt, nBand)
+        Phonon frequencies in THz.
+    n_bands   : int
+        Number of phonon branches.
+    tau       : ndarray, shape (nQpt, nBand)
+        Phonon lifetimes in ps.
+    """
     with open(filepath, 'w') as o:
         o.write(f"# Lifetime vs Frequency\n")
         for band_index in range(n_bands):
@@ -226,7 +484,20 @@ def write_lifetime_vs_frequency(filepath, frequency, n_bands, tau):
 
 
 def read_heat_capacity(filepath):
-    
+    """Read BTE.cvVsT.
+ 
+    Parameters
+    ----------
+    filepath : str
+        Path to BTE.cvVsT.
+ 
+    Returns
+    -------
+    temperature   : ndarray, shape (nT,)
+        Temperature values in K.
+    heat_capacity : ndarray, shape (nT,)
+        Total heat capacity in eV/K.
+    """
     lines = _read_file(filepath)
     temperature = lines[:, 0]
     heat_capacity = lines[:, 1]
@@ -235,7 +506,17 @@ def read_heat_capacity(filepath):
 
 
 def write_heat_capacity_vs_temperature(filepath, temperature, heat_capacity):
-    
+    """Write total heat capacity Cv vs temperature.
+ 
+    Parameters
+    ----------
+    filepath      : str
+        Output file path.
+    temperature   : ndarray, shape (nT,)
+        Temperature values in K.
+    heat_capacity : ndarray, shape (nT,)
+        Total heat capacity in eV/K.
+    """
     with open(filepath, 'w') as o:
         o.write("# Heat capacity vs Temperature\n")
         o.write(CV_HEADER + "\n")
@@ -245,7 +526,31 @@ def write_heat_capacity_vs_temperature(filepath, temperature, heat_capacity):
 
 
 def read_mode_kappa(filepath, n_bands):
-
+    """Read converged per-band κ from the last row of BTE.kappa, summing
+    optical branches into a single entry.
+ 
+    BTE.kappa layout: each row is one iteration of the convergence process.
+    Column 0 is the iteration index; the remaining 9×nBand columns store
+    the 9 full tensor components (xx xy xz yx yy yz zx zy zz) for each
+    band consecutively: [kxx_b1 kxy_b1 ... kzz_b1 kxx_b2 ... kzz_bn].
+    The last row holds the converged values.
+ 
+    The first 3 bands are treated as acoustic; all remaining bands are
+    optical and their κ contributions are summed into one row.
+ 
+    Parameters
+    ----------
+    filepath : str
+        Path to BTE.kappa inside a T<N>K/ subdirectory.
+    n_bands  : int
+        Number of phonon branches.
+ 
+    Returns
+    -------
+    mode_kappa_sum : ndarray, shape (4, 9)
+        Rows 0-2: acoustic bands 1-3; row 3: sum of all optical bands.
+        All 9 tensor components (xx xy xz yx yy yz zx zy zz) in W/m-K.
+    """
     lines = _read_file(filepath)
     mode_kappa = lines[-1, 1:].reshape(n_bands, 9)
     mode_kappa_sum = np.concatenate((
@@ -257,7 +562,21 @@ def read_mode_kappa(filepath, n_bands):
 
 
 def collect_mode_kappa(temp_dirs, n_bands):
-    
+    """Collect converged per-band κ across all temperatures from BTE.kappa.
+ 
+    Parameters
+    ----------
+    temp_dirs : list of str
+        Ordered list of T<N>K/ directory paths (ascending temperature).
+    n_bands   : int
+        Number of phonon branches.
+ 
+    Returns
+    -------
+    mode_kappa_all : ndarray, shape (nT, 4, 9)
+        Converged κ per temperature: rows 0-2 acoustic bands, row 3
+        optical sum, each with 9 tensor components in W/m-K.
+    """
     mode_kappa_all = []
     for temppath in temp_dirs:
         filepath = os.path.join(temppath, "BTE.kappa")
@@ -268,7 +587,23 @@ def collect_mode_kappa(temp_dirs, n_bands):
 
 
 def write_kappa_band_vs_temperature(filepath, temperature, mode_kappa_sum):
-
+    """Write per-band κ (all 9 tensor components) vs temperature.
+ 
+    Output is organized in per-band blocks, each preceded by a band index
+    header and TENSOR_HEADER. Blocks 1-3 are acoustic bands; block 4 is
+    the sum of all optical bands. All 9 components are written to handle
+    materials with non-zero off-diagonal elements.
+ 
+    Parameters
+    ----------
+    filepath       : str
+        Output file path.
+    temperature    : ndarray, shape (nT,)
+        Temperature values in K.
+    mode_kappa_sum : ndarray, shape (nT, 4, 9)
+        Converged κ per temperature: rows 0-2 acoustic, row 3 optical sum,
+        each with 9 tensor components (xx xy xz yx yy yz zx zy zz) in W/m-K.
+    """
     with open(filepath, 'w') as o:
         o.write("# Thermal conductivity(W/m-K) vs Temperature\n")
         o.write("# Sum all optical branch to one\n")
@@ -282,7 +617,24 @@ def write_kappa_band_vs_temperature(filepath, temperature, mode_kappa_sum):
 
 
 def read_cumulative_kappa_vs_mfp(filepath):
-
+    """Read BTE.cumulative_kappa_tensor (cumulative κ vs MFP).
+ 
+    MFP is read directly from column 0; no computation from group velocity
+    or lifetime is performed.
+ 
+    Parameters
+    ----------
+    filepath : str
+        Path to BTE.cumulative_kappa_tensor.
+ 
+    Returns
+    -------
+    mfp              : ndarray, shape (N,)
+        Mean free path values in Å (column 0 of the file).
+    cumulative_kappa : ndarray, shape (N, 9)
+        Cumulative κ full tensor components (xx xy xz yx yy yz zx zy zz)
+        in W/m-K.
+    """
     lines = _read_file(filepath)
     mfp = lines[:, 0]
     cumulative_kappa = lines[:, 1:10]
@@ -291,7 +643,17 @@ def read_cumulative_kappa_vs_mfp(filepath):
 
 
 def write_cumulative_kappa_vs_mfp(filepath, mfp, cumulative_kappa):
-
+    """Write cumulative κ (all 9 tensor components) vs mean free path.
+ 
+    Parameters
+    ----------
+    filepath         : str
+        Output file path.
+    mfp              : ndarray, shape (N,)
+        Mean free path in Å.
+    cumulative_kappa : ndarray, shape (N, 9)
+        Cumulative κ tensor components (xx xy xz yx yy yz zx zy zz) in W/m-K.
+    """
     with open(filepath, 'w') as o:
         o.write("# Cumulative kappa vs MFP\n")
         o.write(MFP_HEADER + "\n")
@@ -303,7 +665,21 @@ def write_cumulative_kappa_vs_mfp(filepath, mfp, cumulative_kappa):
 
 
 def read_cumulative_kappa_vs_frequency(filepath):
-
+    """Read BTE.cumulative_kappaVsOmega_tensor (cumulative κ vs frequency).
+ 
+    Parameters
+    ----------
+    filepath : str
+        Path to BTE.cumulative_kappaVsOmega_tensor.
+ 
+    Returns
+    -------
+    frequency        : ndarray, shape (N,)
+        Phonon frequencies in THz.
+    cumulative_kappa : ndarray, shape (N, 9)
+        Cumulative κ full tensor components (xx xy xz yx yy yz zx zy zz)
+        in W/m-K.
+    """
     lines = _read_file(filepath)
     omega = lines[:, 0]
     cumulative_kappa = lines[:, 1:10]
@@ -313,7 +689,17 @@ def read_cumulative_kappa_vs_frequency(filepath):
 
 
 def write_cumulative_kappa_vs_frequency(filepath, frequency, cumulative_kappa):
-
+    """Write cumulative κ (all 9 tensor components) vs frequency.
+ 
+    Parameters
+    ----------
+    filepath         : str
+        Output file path.
+    frequency        : ndarray, shape (N,)
+        Phonon frequencies in THz.
+    cumulative_kappa : ndarray, shape (N, 9)
+        Cumulative κ tensor components (xx xy xz yx yy yz zx zy zz) in W/m-K.
+    """
     with open(filepath, 'w') as o:
         o.write("# Cumulative kappa vs Frequency\n")
         o.write(FREQ_HEADER + "\n")
@@ -325,18 +711,19 @@ def write_cumulative_kappa_vs_frequency(filepath, frequency, cumulative_kappa):
 
 
 def detect_temp_dirs(dirpath):
-    """
-    Find all T<int>K subdirectories in base_dir.
+    """Find all T<int>K subdirectories in *dirpath*.
  
     Parameters
     ----------
-    base_dir : str
+    dirpath : str
         Root ShengBTE output directory.
  
     Returns
     -------
-    dict
-        {temperature_K (int): absolute_path (str)}, sorted ascending.
+    temperatures : ndarray, shape (nT,)
+        Temperature values in K, sorted ascending.
+    temp_dirs    : list of str
+        Corresponding absolute paths, sorted ascending by temperature.
     """
     dirs = {}
 
@@ -368,6 +755,7 @@ def detect_temp_dirs(dirpath):
 
 
 def main():
+    """Parse arguments, read ShengBTE output files, and write organized data files."""
     if '-h' in argv or len(argv) != 2:
         usage()
     
@@ -383,7 +771,6 @@ def main():
     print(f"Found {len(temp_dirs)} temperature point(s): "
           f"{[temp for temp in temperatures]} K")
     
-    print("\nReading temperature-independent files...")
     freq_path = os.path.join(work_dir, "BTE.omega")
     frequency, n_qpoints, n_bands = read_frequency(freq_path)
     qpoints_path = os.path.join(work_dir, "BTE.qpoints")
@@ -578,6 +965,8 @@ def main():
             frequency_wp4_minusminus, gamma_wp4_minusminus = read_weighted_phase_space(wp4_minusminus_path, n_qpoints, n_bands)
             write_weighted_phase_space_vs_frequency(os.path.join(temppath, "WeightedPhaseSpace_4ph_SplittingVsFrequency.dat"), frequency_wp4_minusminus, n_bands, gamma_wp4_minusminus)
 
+    print("Data extraction and organization complete.")
+    
 
 if __name__ == "__main__":
     main()
