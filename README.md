@@ -36,7 +36,7 @@ All scripts are standalone CLI tools written in Python using NumPy as the primar
 
 ### 1. Thermal Transport Analysis
 
-Scripts in this category read HDF5 output files from [Phono3py](https://phonopy.github.io/phono3py/) or output files from [ShengBTE](https://www.shengbte.org/) and analyze lattice thermal conductivity data.
+Scripts in this category post-process force constants and read HDF5 output files from [Phono3py](https://phonopy.github.io/phono3py/) or output files from [ShengBTE](https://www.shengbte.org/) to analyze lattice thermal conductivity data.
 
 ---
 
@@ -475,4 +475,4 @@ All scripts follow the same conventions modeled on `vaspSupercell.py`:
 
 ## License
 
-Developed by [Thanasee Thanasarnsurapong](https://scholar.google.com/citations?user=4KHXv9gAAAAJ&hl=en) and [Cluade](https://claude.ai/). For research and academic use.
+Developed by [Thanasee Thanasarnsurapong](https://scholar.google.com/citations?user=4KHXv9gAAAAJ&hl=en) and [Claude](https://claude.ai/). For research and academic use.
