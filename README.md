@@ -85,28 +85,29 @@ Extracts mode-resolved thermal transport properties from a single Phono3py `kapp
 Usage: analyzePhono3py.py <kappa HDF5 file> <gruneisen HDF5 file (optional)>
 ```
 
-Output filenames follow the pattern `<tag>-mXXXXXX.dat`, where the mesh token is preserved from the input filename. All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/m-K.
+Output filenames follow the pattern `<tag>-mXXXXXX.dat`, where the mesh token is preserved from the input filename (e.g., `kappa-m111111.hdf5` → `KappaVsT-m111111.dat`). All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/m-K.
 
 **2D renormalization:** After loading the HDF5 file, the script interactively prompts for dimensionality (1 = 3D, 2 = 2D). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ arrays before any output is written, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/m-K throughout. The renormalization applies to all output file groups below.
 
 **Temperature-dependent files** (one value per temperature row, written to the working directory):
-- `KappaVsT` — total κ tensor vs. temperature
-- `Kappa_bandVsT` — κ tensor decomposed into 3 acoustic branches + 1 summed optical branch vs. temperature
-- `ContributeKappaVsT` — per-mode percentage contribution to total κ vs. temperature
-- `Tau_CRTAVsT` — phonon lifetime (CRTA) vs. temperature *(if available)*
-- Equivalent files for RTA, Wigner-C, Wigner-P (RTA), and Wigner-P (exact) variants *(if available)*
+- `KappaVsT.dat` / `Kappa_bandVsT.dat` — total κ tensor and band decomposition (3 acoustic + 1 summed optical) vs. temperature
+- `ContributeKappaVsT.dat` — per-mode percentage contribution to total κ vs. temperature
+- `CvVsT.dat` — total heat capacity Cv (eV/K) vs. temperature
+- `Tau_CRTAVsT.dat` / `Tau_AvgVsT.dat` — CRTA and average phonon lifetime τ (ps) vs. temperature
+- `Kappa_RTAVsT.dat` / `Kappa_RTA_bandVsT.dat` — RTA κ tensor and band decomposition vs. temperature *(--lbte only)*
+- `Kappa_C*VsT.dat` — wave-like (coherence) Wigner κ tensor and band decomposition vs. temperature *(--wigner only)*
+- `Kappa_P_RTA*VsT.dat` / `Kappa_TOT_RTA*VsT.dat` — particle-like and total Wigner κ (RTA) vs. temperature *(--wigner --br only)*
+- `Kappa_P_exact*VsT.dat` / `Kappa_TOT_exact*VsT.dat` — particle-like and total Wigner κ (exact) vs. temperature *(--wigner --lbte only)*
 
-**Per-temperature spectral files** (one file per temperature, written to subdirectories `T{value}K/`):
-- `KappaVsFrequency` — mode κ vs. phonon frequency (THz)
-- `KappaVsMfp` — mode κ vs. mean free path (Å)
-- `cumulative_KappaVsFrequency` — cumulative κ sorted by ascending frequency
-- `derivative_KappaVsFrequency` — spectral κ density d(κ)/d(frequency)
-- `cumulative_KappaVsMfp` — cumulative κ sorted by ascending mean free path
-- `derivative_KappaVsMfp` — spectral κ density d(κ)/d(MFP)
+**Temperature-independent files** (written to the working directory):
+- `GvVsFrequency.dat` / `Gv_amplitudeVsFrequency.dat` — group velocity vector (vx, vy, vz) and amplitude |v| vs. frequency (THz)
+- `GruneisenVsFrequency.dat` — Grüneisen parameter vs. frequency (THz) *(if Grüneisen HDF5 provided)*
+- `Gamma_isotopeVsFrequency.dat` — isotope scattering rate vs. frequency *(if available)*
 
-**Grüneisen / group velocity files** *(written only when the Grüneisen HDF5 is provided)*:
-- `GvVsFrequency` — group velocity magnitude vs. frequency
-- `Gamma_isotopeVsFrequency` — isotope scattering rate vs. frequency *(if available)*
+**Per-temperature spectral files** (one file per temperature, written to subdirectories `T<value>K/`):
+- `KappaVsFrequency.dat` / `KappaVsMfp.dat` — mode κ vs. phonon frequency (THz) and vs. mean free path (Å)
+- `cumulative_KappaVsFrequency.dat` / `cumulative_KappaVsMfp.dat` — cumulative κ sorted by ascending frequency and MFP
+- `derivative_KappaVsFrequency.dat` / `derivative_KappaVsMfp.dat` — spectral κ density d(κ)/d(frequency) and d(κ)/d(MFP)
 
 ---
 
@@ -146,7 +147,7 @@ Extracts thermal transport properties from [ShengBTE](https://www.shengbte.org/)
 Usage: analyzeShengBTE.py <3ph/4ph>
 ```
 
-Temperature subdirectories (`T<N>K/`) are detected automatically from the working directory. All κ tensor components are written as the full 3×3 tensor (xx, xy, xz, yx, yy, yz, zx, zy, zz) in W/(m·K). All scattering rate and lifetime files are written per phonon branch. Phonon lifetimes are computed as τ = 1/(2 × 2π × Γ) (ps); modes with Γ ≤ 0 are assigned τ = 0.
+Temperature subdirectories (`T<value>K/`) are detected automatically from the working directory. All κ tensor components are written as the full 3×3 tensor (xx, xy, xz, yx, yy, yz, zx, zy, zz) in W/(m·K). All scattering rate and lifetime files are written per phonon branch. Phonon lifetimes are computed as τ = 1/(2 × 2π × Γ) (ps); modes with Γ ≤ 0 are assigned τ = 0.
 
 **Temperature-dependent files** (one value per temperature row, written to the working directory):
 - `Kappa_RTAVsT.dat` / `Kappa_CONVVsT.dat` — total κ tensor vs. temperature, RTA and iterative (CONV) solutions
@@ -160,7 +161,7 @@ Temperature subdirectories (`T<N>K/`) are detected automatically from the workin
 - `P3VsFrequency.dat`, `P3_AdsorptionVsFrequency.dat`, `P3_EmissionVsFrequency.dat` — total, absorption (+), and emission (−) 3-phonon phase space vs. frequency; each header records the corresponding scalar total
 - `P4*.dat` — same set for 4-phonon phase space (total, recombination ++, redistribution +-, splitting −−) *[FourPhonon only]*
 
-**Per-temperature files** (written into each `T<N>K/` subdirectory):
+**Per-temperature files** (written into each `T<value>K/` subdirectory):
 - `CumulativeKappaVsMFP.dat` / `CumulativeKappaVsFrequency.dat` — cumulative κ tensor vs. mean free path (Å) and vs. frequency (THz)
 - `ScatteringRate_3ph*.dat` / `Lifetime_3ph*.dat` — 3ph scattering rate Γ and lifetime τ vs. frequency; process variants: total, `_Adsorption`, `_Emission`
 - `ScatteringRateVsFrequency.dat` / `LifetimeVsFrequency.dat` — total combined (3ph + isotope) Γ and τ vs. frequency
