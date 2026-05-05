@@ -10,7 +10,7 @@ A collection of Python scripts for VASP output analysis and related tasks, devel
 
 This repository is organized into four functional categories:
 
-1. **Thermal transport analysis** — extract and analyze lattice thermal conductivity variables from Phono3py HDF5 output files and ShengBTE output files
+1. **Thermal transport analysis** — post-process force constants, extract and analyze lattice thermal conductivity variables from Phono3py HDF5 output files and ShengBTE output files
 2. **Structural analysis** — calculate structural properties (e.g., bond distances) from VASP POSCAR/CONTCAR files
 3. **Mechanical properties** — extract and plot elastic tensors, piezoelectric tensors, and related quantities from VASP output files
 4. **Structure preparation** — generate and manipulate POSCAR files for various VASP calculations
@@ -121,6 +121,20 @@ Usage: compareIFCs.py <DFT's force constants HDF5 input> <MLFF's force constants
 **Output files:**
 - `2ndIFCs.dat` — 2nd-order IFC comparison in eV/Å^2
 - `3rdIFCs.dat` — 3rd-order IFC comparison in eV/Å^3
+
+---
+
+#### `getQPATH.py`
+
+Reads the high-symmetry q-point path positions from a `band.dat` file produced by `phonopy-bandplot --gnuplot` and writes `QLINES.dat` — a boundary-line file in the same format as `KLINES.dat` from VASPKIT, suitable for overlaying q-path tick marks and the frequency window on a phonon band structure plot in xmgrace or gnuplot.
+
+```
+Usage: getQPATH.py <band.dat input>
+```
+
+Q-point path distances (1/Å) are read from the second line of the input file. The frequency range is determined automatically as floor(f_min) to ceil(f_max) from all frequency values in the file. For each interior high-symmetry q-point, three coordinate pairs are written to trace a vertical tick from `fmin` to `fmax` and back. The outer box boundaries and the zero-frequency axis are appended at the end.
+
+**Output:** `QLINES.dat` — columns: q-path distance (1/Å), frequency boundary (THz).
 
 ---
 
