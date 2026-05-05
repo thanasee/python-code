@@ -27,7 +27,7 @@ GAMMA_HEADER      = "#  Frequency(THz) Gamma(ps-1)"
 TAU_HEADER        = "#  Frequency(THz)    Tau(ps)"
 GRUN_HEADER       = "#  Frequency(THz) Gruneisen"
 P_HEADER          = "#  Frequency(THz) Phase space"
-CV_HEADER         = "#  T(K)    Cv(eV/K)"
+CV_HEADER         = "#  T(K)    Cv(J m-3 K-1)"
 
 
 def _read_file(filepath):
@@ -521,7 +521,7 @@ def write_heat_capacity_vs_temperature(filepath, temperature, heat_capacity):
         o.write("# Heat capacity vs Temperature\n")
         o.write(CV_HEADER + "\n")
         for temp, cv in zip(temperature, heat_capacity):
-            o.write(f"  {temp:>7.1f}   {cv:>8.3f}\n")
+            o.write(f"  {temp:>7.1f}   {cv:>14.4e}\n")
         o.write("\n")
 
 
