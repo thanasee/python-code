@@ -104,7 +104,7 @@ def main():
     )
     output_format = "hdf5" if output_fc_file.endswith(".hdf5") else "text"
 
-    cutoff_margin = 0.001
+    cutoff_margin = 1e-5
     sum_rules = ("Huang", "Born-Huang")
     # ---------------------
 
