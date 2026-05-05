@@ -152,7 +152,7 @@ Temperature subdirectories (`T<value>K/`) are detected automatically from the wo
 **Temperature-dependent files** (one value per temperature row, written to the working directory):
 - `Kappa_RTAVsT.dat` / `Kappa_CONVVsT.dat` — total κ tensor vs. temperature, RTA and iterative (CONV) solutions
 - `Kappa_bandVsT.dat` — κ tensor decomposed into 3 acoustic branches + 1 summed optical branch vs. temperature
-- `HeatCapacityVsT.dat` — total heat capacity Cv (eV/K) vs. temperature
+- `HeatCapacityVsT.dat` — total heat capacity Cv (J/m^3-K) vs. temperature
 
 **Temperature-independent files** (written to the working directory):
 - `GroupVelocityVsFrequency.dat` / `GroupVelocityAmplitudeVsFrequency.dat` — group velocity vector (vx, vy, vz) and amplitude |v| in km/s vs. frequency (THz)
