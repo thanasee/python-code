@@ -6,7 +6,7 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: getQPATH.py <band.dat input>
 
 This script read second line in band.dat file
@@ -14,8 +14,7 @@ which generated from phonopy-bandplot --gnuplot command
 and write QLINES.dat in same format with KLINES.dat from VASPKIT
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
