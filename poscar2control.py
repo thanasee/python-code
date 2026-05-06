@@ -7,15 +7,13 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    
-    text = """
+    print("""
 Usage: poscar2control.py <input>
 
 This script convert POSCAR format to CONTROL format for ShengBTE.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
