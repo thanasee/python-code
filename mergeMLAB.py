@@ -6,8 +6,7 @@ from collections import OrderedDict
 
 def usage():
     """Print usage information and exit."""
-    
-    text = """
+    print("""
 Usage: mergeMLAB.py <input1> <input2> [input3 ...] <output>
 
 This script merges ML_AB-format data files into one file.
@@ -15,8 +14,7 @@ It combines the header information, unifies basis sets for each atom type,
 and rewrites configuration numbering in the merged output.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
