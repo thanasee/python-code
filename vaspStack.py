@@ -7,7 +7,7 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: vaspStack.py <input>
 
 This script supports VASP5 structure file format (i.e. POSCAR)
@@ -15,8 +15,7 @@ for generated bilayer from input file and also prepared stacking images
 only support monolayer file which has vacuum space in z direction.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
