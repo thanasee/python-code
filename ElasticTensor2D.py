@@ -7,8 +7,7 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-
-    text = """
+    print("""
 Usage: ElasticTensor2D.py <mode> [structure file]
 
 This script supports VASP5 Structure file format (i.e. POSCAR)
@@ -19,8 +18,7 @@ Mode:
 - post                  : get energy and calculate elastic tensor
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
