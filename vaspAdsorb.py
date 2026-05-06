@@ -7,8 +7,7 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    
-    text = """
+    print("""
 Usage: vaspAdsorb.py <substrate input> <adsorbent input> <output>
 
 This script design to prepare position file for adsorption calculation
@@ -19,8 +18,7 @@ This script support VASP5 position file format (i.e. POSCAR).
 
 This script was inspired by Aroon Ananchunsook
 and developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
@@ -817,8 +815,8 @@ Method of positioning adsorbent
                 new_flags = np.full((total_atoms, 3), 'T')
 
                 fix_prompt = (f"\nInput element-symbol and/or atom-indexes to choose "
-f"(  1 to {total_atoms:>3})\n"
-f"(Free-format input, e.g., 1 3 1-4 C H all)")
+                              f"(  1 to {total_atoms:>3})\n"
+                              f"(Free-format input, e.g., 1 3 1-4 C H all)")
                 fixed_atoms = selection_atoms(fix_prompt, total_atoms, species)
                 fix_coordinates = select_direction()
                 
