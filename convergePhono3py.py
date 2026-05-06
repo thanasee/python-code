@@ -8,14 +8,13 @@ import h5py as h5
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: convergePhono3py.py
 
 This script obtain lattice thermal conductivity depends on q-mesh from HDF5 files
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
