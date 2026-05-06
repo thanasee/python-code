@@ -10,8 +10,7 @@ from scipy.constants import Avogadro, h, k
 
 def usage():
     """Print usage information and exit."""
-    
-    text = """
+    print("""
 Usage: vaspMechanics.py <POSCAR input> <OUTCAR input>
 
 This script calculates Young's modulus and Poisson's Ratio as functions of crystal orientation.
@@ -20,8 +19,7 @@ Check mechanical stability too.
 This script read POSCAR and OUTCAR files by default.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
@@ -195,13 +193,13 @@ def write_elastic_2d(C11, C22, C12, C66, C16, C26):
     with open('Elastic.dat', 'w') as o:
         o.write(header + rows)
     
-    print("\n# Elastic tensor(N/m)")
-    print("#     C11         C12         C16")
-    print("#     C12         C22         C26")
-    print("#     C16         C26         C66")
-    print(f"   {C11:>11.4f} {C12:>11.4f} {C16:>11.4f}")
-    print(f"   {C12:>11.4f} {C22:>11.4f} {C26:>11.4f}")
-    print(f"   {C16:>11.4f} {C26:>11.4f} {C66:>11.4f}\n")
+    print("\n# Elastic tensor(N/m)\n"
+          "#     C11         C12         C16\n"
+          "#     C12         C22         C26\n"
+          "#     C16         C26         C66\n\n"
+          f"   {C11:>11.4f} {C12:>11.4f} {C16:>11.4f}\n"
+          f"   {C12:>11.4f} {C22:>11.4f} {C26:>11.4f}\n"
+          f"   {C16:>11.4f} {C26:>11.4f} {C66:>11.4f}\n")
 
 
 def check_stability_2d(elastic_2d, factor_2d):
@@ -406,23 +404,31 @@ def write_elastic_3d(elastic_3d):
         "#     C15         C25         C35         C45         C55         C56\n"
         "#     C16         C26         C36         C46         C56         C66\n\n"
     )
-    rows = ""
-    for i in range(6):
-        rows += "   " + " ".join(f"{C[i, j]:>11.4f}" for j in range(6)) + "\n"
+    rows = (
+        f"   {C[0, 0]:>11.4f} {C[0, 1]:>11.4f} {C[0, 2]:>11.4f} {C[0, 3]:>11.4f} {C[0, 4]:>11.4f} {C[0, 5]:>11.4f}\n"
+        f"   {C[1, 0]:>11.4f} {C[1, 1]:>11.4f} {C[1, 2]:>11.4f} {C[1, 3]:>11.4f} {C[1, 4]:>11.4f} {C[1, 5]:>11.4f}\n"
+        f"   {C[2, 0]:>11.4f} {C[2, 1]:>11.4f} {C[2, 2]:>11.4f} {C[2, 3]:>11.4f} {C[2, 4]:>11.4f} {C[2, 5]:>11.4f}\n"
+        f"   {C[3, 0]:>11.4f} {C[3, 1]:>11.4f} {C[3, 2]:>11.4f} {C[3, 3]:>11.4f} {C[3, 4]:>11.4f} {C[3, 5]:>11.4f}\n"
+        f"   {C[4, 0]:>11.4f} {C[4, 1]:>11.4f} {C[4, 2]:>11.4f} {C[4, 3]:>11.4f} {C[4, 4]:>11.4f} {C[4, 5]:>11.4f}\n"
+        f"   {C[5, 0]:>11.4f} {C[5, 1]:>11.4f} {C[5, 2]:>11.4f} {C[5, 3]:>11.4f} {C[5, 4]:>11.4f} {C[5, 5]:>11.4f}\n"
+    )
     
     with open('Elastic.dat', 'w') as o:
         o.write(header + rows)
     
-    print("\n# Elastic tensor(GPa)")
-    print("#     C11         C12         C13         C14         C15         C16")
-    print("#     C12         C22         C23         C24         C25         C26")
-    print("#     C13         C23         C33         C34         C35         C36")
-    print("#     C14         C24         C34         C44         C45         C46")
-    print("#     C15         C25         C35         C45         C55         C56")
-    print("#     C16         C26         C36         C46         C56         C66")
-    for i in range(6):
-        print("   " + " ".join(f"{C[i, j]:>11.4f}" for j in range(6)))
-    print()
+    print("\n# Elastic tensor(GPa)\n"
+          "#     C11         C12         C13         C14         C15         C16\n"
+          "#     C12         C22         C23         C24         C25         C26\n"
+          "#     C13         C23         C33         C34         C35         C36\n"
+          "#     C14         C24         C34         C44         C45         C46\n"
+          "#     C15         C25         C35         C45         C55         C56\n"
+          "#     C16         C26         C36         C46         C56         C66\n\n"
+          f"   {C[0, 0]:>11.4f} {C[0, 1]:>11.4f} {C[0, 2]:>11.4f} {C[0, 3]:>11.4f} {C[0, 4]:>11.4f} {C[0, 5]:>11.4f}\n"
+          f"   {C[1, 0]:>11.4f} {C[1, 1]:>11.4f} {C[1, 2]:>11.4f} {C[1, 3]:>11.4f} {C[1, 4]:>11.4f} {C[1, 5]:>11.4f}\n"
+          f"   {C[2, 0]:>11.4f} {C[2, 1]:>11.4f} {C[2, 2]:>11.4f} {C[2, 3]:>11.4f} {C[2, 4]:>11.4f} {C[2, 5]:>11.4f}\n"
+          f"   {C[3, 0]:>11.4f} {C[3, 1]:>11.4f} {C[3, 2]:>11.4f} {C[3, 3]:>11.4f} {C[3, 4]:>11.4f} {C[3, 5]:>11.4f}\n"
+          f"   {C[4, 0]:>11.4f} {C[4, 1]:>11.4f} {C[4, 2]:>11.4f} {C[4, 3]:>11.4f} {C[4, 4]:>11.4f} {C[4, 5]:>11.4f}\n"
+          f"   {C[5, 0]:>11.4f} {C[5, 1]:>11.4f} {C[5, 2]:>11.4f} {C[5, 3]:>11.4f} {C[5, 4]:>11.4f} {C[5, 5]:>11.4f}\n")
 
 
 def check_stability_3d(elastic_3d):
