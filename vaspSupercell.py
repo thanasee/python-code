@@ -7,7 +7,7 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: vaspSupercell.py <input> <output>
  
 This script supports VASP5 structure file format (i.e. POSCAR)
@@ -19,8 +19,7 @@ The expansion matrix can be specified as:
  
 This script was inspired by Jiraroj T-Thienprasert
 and developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
