@@ -7,15 +7,14 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: mlRegression.py <ML_REG input>
 
 This script extract energies, forces, and stress from ML_REG file.
 Output files can plot by xmgrace.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
