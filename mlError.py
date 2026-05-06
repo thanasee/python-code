@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 from sys import argv, exit
 import os
 import numpy as np
@@ -6,15 +7,14 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: mlError.py <ML_LOGFILE input>
 
 This script extract the Bayesian error estimation and the Root mean square error from ML_LOGFILE file.
 Output files can plot by xmgrace.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
