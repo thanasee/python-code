@@ -7,16 +7,14 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
+    print("""
+Usage: calRMS.py <input POSCAR> <input FORCE_CONSTANTS>
 
-    text = """
-Usage: calDistance.py <input>
+This script calculate RMS of 2nd order of IFCs
+and compare with distance between atoms from POSCAR/CONTCAR files
 
-This script calculate distance between atoms from POSCAR/CONTCAR files.
-
-This script was inspired by Jiraroj T-Thienprasert
-and developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+This script was developed by Thanasee Thanasarnsurapong.
+""")
     exit(0)
 
 
@@ -321,378 +319,177 @@ def define_labels(elements, atom_counts):
     return labels
 
 
-def compute_image_offsets(lattice_matrix):
-    """Pre-compute all 27 periodic image translation vectors.
+def read_FORCE_CONSTANTS(filepath, total_atoms):
+    """Read and parse a phonopy/phono3py FORCE_CONSTANTS file.
 
-    Generates vectors k*a + l*b + m*c for k, l, m in {-1, 0, 1},
-    covering the origin cell and all 26 neighbouring cells.
-    Used to find the minimum-image distance under periodic boundary conditions.
+    The file format is:
+      Line 0  : <total_symmetry> <total_atoms>
+      Per block: one header line with atom pair indices,
+                 followed by a 3x3 IFC matrix (3 lines of 3 values each).
+    The RMS is computed per block as sqrt(mean(Phi_ij^2)) over all 9 elements.
 
     Parameters
     ----------
-    lattice_matrix : (3, 3) ndarray, Cartesian lattice vectors (Angstrom)
+    filepath    : str, path to the FORCE_CONSTANTS file
+    total_atoms : int, expected number of atoms (must match file header)
 
     Returns
     -------
-    image_offsets : (27, 3) ndarray, translation vectors in Cartesian coordinates
+    dict with keys:
+        total_symmetry : int, number of symmetry-inequivalent atom pairs
+        pair_list      : list of list of str, atom pair indices per block
+        rms            : list of float, RMS of each 3x3 IFC block in eV/Angstrom^2
+    """
+
+    with open(filepath, 'r') as f:
+        force_lines = f.readlines()
+
+    total_symmetry, force_total_atoms = map(int, force_lines[0].split())
+
+    if force_total_atoms != total_atoms:
+        print("ERROR! Total atoms not match.")
+        exit(1)
+
+    pair_list = []
+    rms = []
+    line_index = 1
+
+    for _ in range(total_symmetry):
+        for _ in range(force_total_atoms):
+            pair_list.append(force_lines[line_index].split())
+            line_index += 1
+
+            rms.append(np.sqrt(np.mean([float(x) ** 2
+                                        for i in range(3)
+                                        for x in force_lines[line_index + i].split()])))
+            line_index += 3
+
+    return {"total_symmetry": total_symmetry,
+            "pair_list": pair_list,
+            "rms": rms}
+
+
+def compute_image_offsets(lattice_matrix):
+    """Compute Cartesian offset vectors for all 27 periodic images.
+
+    Generates all combinations of (k, l, m) in {-1, 0, 1}^3 and converts
+    them to Cartesian coordinates using the lattice matrix. These offsets
+    are used for minimum image distance calculations under PBC.
+
+    Parameters
+    ----------
+    lattice_matrix : np.ndarray, shape (3, 3), Cartesian lattice vectors in Angstrom
+
+    Returns
+    -------
+    image_offsets : np.ndarray, shape (27, 3), Cartesian offset vectors in Angstrom
     """
 
     klm = np.array([[k, l, m] for k in range(-1, 2)
                                for l in range(-1, 2)
-                               for m in range(-1, 2)])
+                               for m in range(-1, 2)])   # (27, 3)
     
     return klm @ lattice_matrix
 
 
-def min_image_distance(position_i, position_j, image_offsets):
-    """Compute the minimum-image distance between two atomic positions.
+def calculate_distance_rms(lattice_matrix, total_atoms, positions_cartesian, image_offsets,
+                           pair_list, rms, labels):
+    """Calculate minimum image distances and pair them with IFC RMS values.
 
-    Adds all 27 image offsets to the displacement vector and returns
-    the shortest distance, accounting for periodic boundary conditions.
+    For each symmetry-inequivalent atom (select atom), computes the minimum
+    periodic image distance to every other atom using vectorised NumPy
+    broadcasting over all 27 image offsets. Results are sorted by distance.
 
     Parameters
     ----------
-    position_i    : (3,) ndarray, Cartesian position of atom i (Angstrom)
-    position_j    : (3,) ndarray, Cartesian position of atom j (Angstrom)
-    image_offsets : (27, 3) ndarray, periodic image translation vectors
+    lattice_matrix      : np.ndarray, shape (3, 3), Cartesian lattice vectors in Angstrom
+    total_atoms         : int, total number of atoms
+    positions_cartesian : np.ndarray, shape (N, 3), Cartesian coordinates in Angstrom
+    image_offsets       : np.ndarray, shape (27, 3), PBC image offset vectors in Angstrom
+    pair_list           : list of list of str, atom pair indices from FORCE_CONSTANTS
+    rms                 : list of float, RMS of each 3x3 IFC block in eV/Angstrom^2
+    labels              : list of str, atom labels in the same order as positions
 
     Returns
     -------
-    float : minimum-image distance in Angstrom
+    distance_rms : list of tuple (label_i, label_j, distance, rms),
+                   sorted by distance in Angstrom
     """
 
-    diff = position_j - position_i                   # (3,)
-    diff_offset = diff[np.newaxis, :] + image_offsets # (27, 3)
-    
-    return np.linalg.norm(diff_offset, axis=1).min()
+    distance_rms = []
+    for index, s in enumerate(range(0, len(pair_list), total_atoms)):
+        select = int(pair_list[s][0]) - 1
+        reference_position_cartesian = positions_cartesian[select]
+
+        # Mask out the selected atom
+        mask = np.arange(total_atoms) != select
+        other_positions_cartesian = positions_cartesian[mask]           # (N-1, 3)
+        other_labels = [labels[i] for i in range(total_atoms) if i != select]
+        other_rms = [rms[i + index * total_atoms] for i in range(total_atoms) if i != select]
+
+        # Displacement vectors: (N-1, 3)
+        diff = other_positions_cartesian - reference_position_cartesian
+
+        # Add all image offsets: (N-1, 1, 3) + (1, 27, 3) → (N-1, 27, 3)
+        diff_images = diff[:, np.newaxis, :] + image_offsets[np.newaxis, :, :]
+
+        # Minimum image distances: (N-1,)
+        min_distances = np.linalg.norm(diff_images, axis=2).min(axis=1)
+
+        for label, distance, r in zip(other_labels, min_distances, other_rms):
+            distance_rms.append((labels[select], label, distance, r))
+
+    # Sort by distance
+    distance_rms.sort(key=lambda x: x[2])
+
+    return distance_rms
 
 
-def min_image_distances(position_reference, positions_others, image_offsets):
-    """Compute minimum-image distances from one reference atom to many others.
+def write_output(elements, distance_rms):
+    """Write distance vs RMS data to element-pair output files.
 
-    Vectorised over N atoms using broadcasting:
-      diff         : (N, 3)
-      diff_offset  : (N, 27, 3)  via (N, 1, 3) + (1, 27, 3)
-      distances    : (N, 27)
-      result       : (N,) minimum over 27 images per atom
+    Creates one output file per unique element pair named RMS_A-B.dat,
+    containing two columns: interatomic distance (Angstrom) and
+    RMS of the 3x3 IFC block (eV/Angstrom^2), sorted by distance.
 
     Parameters
     ----------
-    position_reference : (3,) ndarray, Cartesian position of the reference atom
-    positions_others   : (N, 3) ndarray, Cartesian positions of N other atoms
-    image_offsets      : (27, 3) ndarray, periodic image translation vectors
-
-    Returns
-    -------
-    (N,) ndarray : minimum-image distances in Angstrom
+    elements     : list of str, unique element symbols in the structure
+    distance_rms : list of tuple (label_i, label_j, distance, rms),
+                   sorted by distance
     """
 
-    diff = positions_others - position_reference                         # (N, 3)
-    diff_offset = diff[:, np.newaxis, :] + image_offsets[np.newaxis, :, :] # (N, 27, 3)
-    
-    return np.linalg.norm(diff_offset, axis=2).min(axis=1)              # (N,)
+    element_pairs = [(elements[i], elements[j])
+                     for i in range(len(elements))
+                     for j in range(i, len(elements))]
 
-
-def parse_group(prompt, total_atoms, species, allow_all=True):
-    """Interactively parse a free-format atom selection from the user.
-
-    Accepts a mix of:
-    - Individual atom indexes     : e.g. '1 3 5'
-    - Ranges of atom indexes      : e.g. '1-4'  (inclusive, 1-based)
-    - Element symbols             : e.g. 'Fe C'  (selects all atoms of that species)
-    - Keyword 'all'               : selects all atoms (only if allow_all=True)
-
-    Keeps prompting until a valid, non-empty selection within [1, total_atoms] is given.
-
-    Parameters
-    ----------
-    prompt      : str, message printed before the input prompt
-    total_atoms : int, total number of atoms in the system
-    species     : list of str, element symbol for each atom (length N)
-    allow_all   : bool, whether the keyword 'all' is permitted (default True)
-
-    Returns
-    -------
-    group : list of int, 0-based atom indexes of the selected atoms
-    """
-
-    print(prompt)
-    while True:
-        group = []
-        raw = input().split()
-        valid = True
-        for token in raw:
-            if token == 'all':
-                if not allow_all:
-                    print("  Cannot use 'all' in this method. TRY AGAIN!")
-                    valid = False; break
-                group.extend(range(total_atoms))
-            elif '-' in token:
-                start, end = map(int, token.split('-'))
-                group.extend(range(start - 1, end))
-            elif token.isdigit():
-                group.append(int(token) - 1)
-            else:
-                group.extend([j for j, lbl in enumerate(species) if lbl == token])
-        if not valid:
-            continue
-        if group and all(0 <= idx < total_atoms for idx in group):
-            return group
-        print("  Wrong input atom-indexes! TRY AGAIN!")
-
-
-def one_to_all(total_atoms, positions_cartesian, labels, image_offsets):
-    """Method 1: compute distances from one selected atom to all other atoms.
-
-    Writes two output files:
-    - distance-unsorted.dat : distances in POSCAR atom order
-    - distance-sorted.dat   : distances sorted from shortest to longest
-
-    Parameters
-    ----------
-    total_atoms         : int, total number of atoms
-    positions_cartesian : (N, 3) ndarray, Cartesian atomic positions (Angstrom)
-    labels              : list of str, atom labels (e.g. 'Fe001')
-    image_offsets       : (27, 3) ndarray, periodic image translation vectors
-    """
-
-    while True:
-        select = input(f"Choose the selected atom (  1 to {total_atoms:>3}): ")
-        if select.isdigit() and 0 < int(select) <= total_atoms:
-            index_select = int(select) - 1
-            break
-        print('WRONG No. of the selected atom')
-
-    mask = np.arange(total_atoms) != index_select
-    other_positions = positions_cartesian[mask]
-    other_labels = [labels[i] for i in range(total_atoms) if i != index_select]
- 
-    min_distances = min_image_distances(positions_cartesian[index_select], other_positions, image_offsets)
-    pair = [(labels[index_select], lbl) for lbl in other_labels]
-
-    with open('distance-unsorted.dat', 'w') as o:
-        o.write(f"# Distance between {labels[index_select]} and all other atoms\n")
-        o.write("#   Atom1  Atom2     Distance\n")
-        for (a1, a2), d in zip(pair, min_distances):
-            o.write(f"  {a1:>5s}  {a2:>5s}  {d:>12.8f}\n")
-        o.write(f"      Average   {np.mean(min_distances):>12.8f}\n")
-
-    order = np.argsort(min_distances)
-    with open('distance-sorted.dat', 'w') as o:
-        o.write(f"# Distance between {labels[index_select]} and all other atoms\n")
-        o.write("#   Atom1  Atom2     Distance\n")
-        for i in order:
-            a1, a2 = pair[i]
-            o.write(f"  {a1:>5s}  {a2:>5s}  {min_distances[i]:>12.8f}\n")
-        o.write(f"      Average   {np.mean(min_distances):>12.8f}\n")
-
-
-def atom_pairs(total_atoms, positions_cartesian, labels, image_offsets):
-    """Method 2: compute distances between user-specified atom pairs.
-
-    Prompts for the number of pairs, then for each pair prompts for
-    the 1st and 2nd atom indexes. Prints results to stdout and writes
-    to distance-atom-atom.dat.
-
-    Parameters
-    ----------
-    total_atoms         : int, total number of atoms
-    positions_cartesian : (N, 3) ndarray, Cartesian atomic positions (Angstrom)
-    labels              : list of str, atom labels (e.g. 'Fe001')
-    image_offsets       : (27, 3) ndarray, periodic image translation vectors
-    """
-
-    while True:
-        inp = input("Enter number of pair atoms: ")
-        if inp.isdigit() and int(inp) > 0:
-            number_pair = int(inp); break
-        print("Number of pair atoms must be a positive integer.")
- 
-    distances, pair = [], []
-    for i in range(number_pair):
-        print(f"For pair {i + 1:>3}")
-        while True:
-            s1 = input(f"  Choose the 1st selected atom of pair {i + 1:>3} (  1 to {total_atoms:>3}): ")
-            if s1.isdigit() and 0 < int(s1) <= total_atoms:
-                idx1 = int(s1) - 1; break
-            print('WRONG No. of the 1st selected atom')
-        while True:
-            s2 = input(f"  Choose the 2nd selected atom of pair {i + 1:>3} (  1 to {total_atoms:>3}): ")
-            if s2.isdigit() and 0 < int(s2) <= total_atoms:
-                idx2 = int(s2) - 1; break
-            print('WRONG No. of the 2nd selected atom')
- 
-        min_distance = min_image_distance(positions_cartesian[idx1], positions_cartesian[idx2], image_offsets)
-        pair.append((labels[idx1], labels[idx2]))
-        distances.append(min_distance)
- 
-    print("# Distance between 2 atoms")
-    print("#   Atom1  Atom2     Distance")
-    for (a1, a2), min_distance in zip(pair, distances):
-        print(f"  {a1:>5s}  {a2:>5s}  {min_distance:>12.8f}")
-    print(f"      Average   {np.mean(distances):>12.8f}")
- 
-    with open('distance-atom-atom.dat', 'w') as o:
-        o.write("# Distance between 2 atoms\n")
-        o.write("#   Atom1  Atom2     Distance\n")
-        for (a1, a2), min_distance in zip(pair, distances):
-            o.write(f"  {a1:>5s}  {a2:>5s}  {min_distance:>12.8f}\n")
-        o.write(f"      Average   {np.mean(distances):>12.8f}\n")
-
-
-def atom_molecule(total_atoms, positions_cartesian, species, labels, image_offsets):
-    """Method 3: compute distances from selected atoms to molecule centroids.
-
-    For each pair, prompts for a reference atom and a group of atoms
-    defining the molecule. The distance is measured from the reference atom
-    to the centroid (geometric center) of the selected molecule atoms.
-    Prints results to stdout and writes to distance-atom-molecule.dat.
-
-    Parameters
-    ----------
-    total_atoms         : int, total number of atoms
-    positions_cartesian : (N, 3) ndarray, Cartesian atomic positions (Angstrom)
-    species             : list of str, element symbol for each atom
-    labels              : list of str, atom labels (e.g. 'Fe001')
-    image_offsets       : (27, 3) ndarray, periodic image translation vectors
-    """
-
-    digits = len(str(total_atoms)) + 1
- 
-    while True:
-        inp = input("Enter number of pair atom-molecule: ")
-        if inp.isdigit() and int(inp) > 0:
-            number_pair = int(inp); break
-        print("Number of pair atom-molecule must be a positive integer.")
- 
-    distances, pair = [], []
-    for i in range(number_pair):
-        print(f"For pair {i + 1:>3}")
- 
-        while True:
-            sel = input(f"  Choose the selected atom of pair {i + 1:>3} (  1 to {total_atoms:>3}): ")
-            if sel.isdigit() and 0 < int(sel) <= total_atoms:
-                index_select = int(sel) - 1; break
-            print('WRONG No. of the selected atom')
- 
-        targets = parse_group(f"\nInput element-symbol and/or atom-indexes to choose ({1:>3} to {total_atoms:>3})\n"
-"(Free-format input, e.g., 1 3 1-4 C H all)", total_atoms, species, allow_all=True)
- 
-        target_site = np.mean(positions_cartesian[targets], axis=0)  # centroid (3,)
-        min_distance = min_image_distance(positions_cartesian[index_select], target_site, image_offsets)
-        pair.append((labels[index_select], str(i + 1).zfill(digits)))
-        distances.append(min_distance)
- 
-    print("# Distance between selected atom and molecule")
-    print("#   Atom   Molecule  Distance")
-    for (atom, mol), min_distance in zip(pair, distances):
-        print(f"  {atom:>5s}  {mol:>5s}  {min_distance:>12.8f}")
-    print(f"      Average   {np.mean(distances):>12.8f}")
- 
-    with open('distance-atom-molecule.dat', 'w') as o:
-        o.write("# Distance between selected atom and molecule\n")
-        o.write("#   Atom   Molecule  Distance\n")
-        for (atom, mol), min_distance in zip(pair, distances):
-            o.write(f"  {atom:>5s}  {mol:>5s}  {min_distance:>12.8f}\n")
-        o.write(f"      Average   {np.mean(distances):>12.8f}\n")
-
-
-def z_distance(total_atoms, positions, species):
-    """Method 4: compute the z-axis distance between substrate top and adsorbent bottom.
-
-    Prompts separately for the substrate atom group and the adsorbent atom group.
-    Finds the atom with the highest z-coordinate in the substrate and the atom
-    with the lowest z-coordinate in the adsorbent, then reports their separation
-    along the z-axis. Useful for measuring adsorption height or slab thickness.
-    Results are printed to stdout only.
-
-    Parameters
-    ----------
-    total_atoms : int, total number of atoms
-    positions   : (N, 3) ndarray, Cartesian atomic positions (Angstrom)
-    species     : list of str, element symbol for each atom
-    """
-
-    print("Tip: this method can measure the thickness of your system.")
- 
-    # Substrate: find the atom with the maximum z-coordinate
-    substrate_index = parse_group(f"\nSubstrate — input element-symbol and/or atom-indexes ({1:>3} to {total_atoms:>3})\n"
-"(Free-format input, e.g., 1 3 1-4 C H  — 'all' not allowed)", total_atoms, species, allow_all=False)
- 
-    if len(substrate_index) == 1:
-        highest_substrate = positions[substrate_index[0]]
-    else:
-        z_sub = positions[substrate_index, 2]
-        top_candidates = [substrate_index[j] for j, z in enumerate(z_sub) if z == z_sub.max()]
-        if len(top_candidates) == 1:
-            highest_substrate = positions[top_candidates[0]]
-        else:
-            print(f"  The highest atoms in substrate : {[i + 1 for i in top_candidates]}")
-            while True:
-                sel = input(f"  Select atom in substrate (  1 to {total_atoms:>3}): ")
-                if sel.isdigit() and int(sel) - 1 in top_candidates:
-                    highest_substrate = positions[int(sel) - 1]; break
-                print('WRONG No. of atom in substrate!')
- 
-    # Adsorbent: find the atom with the minimum z-coordinate
-    adsorbent_index = parse_group(f"\nAdsorbent — input element-symbol and/or atom-indexes ({1:>3} to {total_atoms:>3})\n"
-"(Free-format input, e.g., 1 3 1-4 C H  — 'all' not allowed)", total_atoms, species, allow_all=False)
- 
-    if len(adsorbent_index) == 1:
-        lowest_adsorbent = positions[adsorbent_index[0]]
-    else:
-        z_ads = positions[adsorbent_index, 2]
-        bot_candidates = [adsorbent_index[j] for j, z in enumerate(z_ads) if z == z_ads.min()]
-        if len(bot_candidates) == 1:
-            lowest_adsorbent = positions[bot_candidates[0]]
-        else:
-            print(f"  The lowest atoms in adsorbent : {[i + 1 for i in bot_candidates]}")
-            while True:
-                sel = input(f"  Select atom in adsorbent (  1 to {total_atoms:>3}): ")
-                if sel.isdigit() and int(sel) - 1 in bot_candidates:
-                    lowest_adsorbent = positions[int(sel) - 1]; break
-                print('WRONG No. of atom in adsorbent!')
- 
-    distance = np.abs(lowest_adsorbent[2] - highest_substrate[2])
-    print(f"Distance along z-axis is {distance:>12.8f} Angstrom.")
+    for pair in element_pairs:
+        filename = f"RMS_{pair[0]}-{pair[1]}.dat"
+        with open(filename, 'w') as o:
+            o.write("# Distance vs RMS of 2nd IFCs\n")
+            o.write("#   Distance      RMS\n")
+            for item in distance_rms:
+                if ((pair[0] in item[0] and pair[1] in item[1]) or
+                        (pair[1] in item[0] and pair[0] in item[1])):
+                    o.write(f"  {item[2]:>12.8f}  {item[3]:>12.8f}\n")
 
 
 def main():
-    """Parse arguments, read POSCAR, calculate distance by selected method, write output files."""
+    """Parse arguments, calculate distance and IFC RMS, and write outputs."""
 
-    if '-h' in argv or len(argv) != 2:
+    if '-h' in argv or len(argv) != 3:
         usage()
- 
+    
     poscar = read_POSCAR(argv[1])
     mapping = mapping_elements(poscar["elements"], poscar["atom_counts"], poscar["positions_cartesian"],
                                poscar["positions_direct"], poscar["species"],
                                poscar["selective_dynamics"], poscar["flags"])
+    force_constants = read_FORCE_CONSTANTS(argv[2], poscar["total_atoms"])
     labels = define_labels(mapping["elements"], mapping["atom_counts"])
     image_offsets = compute_image_offsets(poscar["lattice_matrix"])
- 
-    print("""
-Choices of calculating distance
- 1) Between selected atom and all other atoms
- 2) Between 2 selected atoms
- 3) Between selected atom and molecule
- 4) Between highest atom in substrate and lowest atom in molecule (along z-axis only)""")
- 
-    while True:
-        method = input("Enter choice : ")
-        if method == '1':
-            one_to_all(poscar["total_atoms"], mapping["positions_cartesian"], labels, image_offsets)
-            break
-        elif method == '2':
-            atom_pairs(poscar["total_atoms"], mapping["positions_cartesian"], labels, image_offsets)
-            break
-        elif method == '3':
-            atom_molecule(poscar["total_atoms"], mapping["positions_cartesian"], mapping["species"], labels, image_offsets)
-            break
-        elif method == '4':
-            z_distance(poscar["total_atoms"], mapping["positions_cartesian"], mapping["species"])
-            break
-        else:
-            print("ERROR! Wrong choice")
+    distance_rms = calculate_distance_rms(poscar["lattice_matrix"], poscar["total_atoms"], mapping["positions_cartesian"],
+                                          image_offsets, force_constants["pair_list"], force_constants["rms"], labels)
+    write_output(mapping["elements"], distance_rms)
 
 
 if __name__ == "__main__":
