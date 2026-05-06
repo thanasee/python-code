@@ -13,15 +13,14 @@ from hiphive.utilities import extract_parameters
 
 def usage():
     """Print usage information and exit."""
-    text = """
-Usage: enforceFC.py [INPUT_FC_FILE] [OUTPUT_FC_FILE]
+    print("""
+Usage: enforceIFC.py [INPUT_FC_FILE] [OUTPUT_FC_FILE]
 
-This script enforces the rotational sum rules on the second-order force constants (FC2) of a supercell structure.
-It reads the primitive and supercell structures, extracts the FC2 from a specified file, applies the rotational sum rules, and writes the modified FC2 back to a file.
+This script enforces the rotational sum rules on the second-order interatomic force constants (IFC2) of a supercell structure.
+It reads the primitive and supercell structures, extracts the IFC2 from a specified file, applies the rotational sum rules, and writes the modified IFC2 back to a file.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
@@ -104,7 +103,7 @@ def main():
     )
     output_format = "hdf5" if output_fc_file.endswith(".hdf5") else "text"
 
-    cutoff_margin = 1e-5
+    cutoff_margin = 0.001
     sum_rules = ("Huang", "Born-Huang")
     # ---------------------
 
