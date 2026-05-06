@@ -7,14 +7,13 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: vaspReformat.py <input> <output>
 
 This script reformat VASP's input structure file to VASP5 Structure file format.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
