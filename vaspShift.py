@@ -7,8 +7,7 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    
-    text = """
+    print("""
 Usage: vaspShift.py <input> <output>
 
 This script support VASP5 Structure file format (i.e. POSCAR) 
@@ -20,8 +19,7 @@ for shifting a structure file:
   adsorbate      ->  shift to origin in XY
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
