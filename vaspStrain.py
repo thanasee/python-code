@@ -7,7 +7,7 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: vaspStrain.py <input> <output>
 
 This script supports VASP5 Structure file format (i.e. POSCAR) 
@@ -18,8 +18,7 @@ The expansion matrix can be specified as:
   9 components  ->  \u03C3_xx \u03C3_xy \u03C3_xz  \u03C3_yx \u03C3_yy \u03C3_yz  \u03C3_zx \u03C3_zy \u03C3_zz  (full 3×3)
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
