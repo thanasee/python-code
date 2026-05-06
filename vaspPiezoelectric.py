@@ -8,15 +8,14 @@ from ase.io import read
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: vaspPiezoelectric.py <POSCAR input> <OUTCAR input>
 
 This script gets piezoelectric stress tensor from OUTCAR file
 and calculates piezoelectric strain tensor by getting elastic coefficients.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
@@ -231,8 +230,8 @@ def get_elastic_tensor(outcar_lines):
     if moduli_index is not None:
         return moduli_index, elastic_coef
 
-    print("The 'TOTAL ELASTIC MODULI (kBar)' section was not found in the OUTCAR file.")
-    print("Read Elastic coefficient from another instead.")
+    print("The 'TOTAL ELASTIC MODULI (kBar)' section was not found in the OUTCAR file.\n"
+          "Read Elastic coefficient from another instead.")
 
     elastic_coef = read_elastic_from_file()
 
@@ -360,13 +359,13 @@ def write_elastic_2d(elastic_2d):
     with open('Elastic.dat', 'w') as o:
         o.write(header + rows)
 
-    print("\n# Elastic tensor(N/m)")
-    print("#       C11         C12         C16")
-    print("#       C12         C22         C26")
-    print("#       C16         C26         C66")
-    print(f"   {C11:>11.4f} {C12:>11.4f} {C16:>11.4f}")
-    print(f"   {C12:>11.4f} {C22:>11.4f} {C26:>11.4f}")
-    print(f"   {C16:>11.4f} {C26:>11.4f} {C66:>11.4f}\n")
+    print("\n# Elastic tensor(N/m)\n"
+          "#     C11         C12         C16\n"
+          "#     C12         C22         C26\n"
+          "#     C16         C26         C66\n\n"
+          f"   {C11:>11.4f} {C12:>11.4f} {C16:>11.4f}\n"
+          f"   {C12:>11.4f} {C22:>11.4f} {C26:>11.4f}\n"
+          f"   {C16:>11.4f} {C26:>11.4f} {C66:>11.4f}\n")
 
 
 def write_piezostress_2d(piezostress_2d):
@@ -401,13 +400,13 @@ def write_piezostress_2d(piezostress_2d):
     with open('Piezoelectric_Stress.dat', 'w') as o:
         o.write(header + rows)
 
-    print("\n# Piezoelectric Stress(10^-10 C/m)")
-    print("#       e11         e12         e16")
-    print("#       e21         e22         e26")
-    print("#       e31         e32         e36")
-    print(f"   {e11:>11.4f} {e12:>11.4f} {e16:>11.4f}")
-    print(f"   {e21:>11.4f} {e22:>11.4f} {e26:>11.4f}")
-    print(f"   {e31:>11.4f} {e32:>11.4f} {e36:>11.4f}\n")
+    print("\n# Piezoelectric Stress(10^-10 C/m)\n"
+          "#       e11         e12         e16\n"
+          "#       e21         e22         e26\n"
+          "#       e31         e32         e36\n\n"
+          f"   {e11:>11.4f} {e12:>11.4f} {e16:>11.4f}\n"
+          f"   {e21:>11.4f} {e22:>11.4f} {e26:>11.4f}\n"
+          f"   {e31:>11.4f} {e32:>11.4f} {e36:>11.4f}\n")
 
 
 def write_piezostrain_2d(piezostrain_2d):
@@ -441,13 +440,13 @@ def write_piezostrain_2d(piezostrain_2d):
     with open('Piezoelectric_Strain.dat', 'w') as o:
         o.write(header + rows)
 
-    print("\n# Piezoelectric Strain(pm/V)")
-    print("#       d11         d12         d16")
-    print("#       d21         d22         d26")
-    print("#       d31         d32         d36")
-    print(f"   {d11:>11.4f} {d12:>11.4f} {d16:>11.4f}")
-    print(f"   {d21:>11.4f} {d22:>11.4f} {d26:>11.4f}")
-    print(f"   {d31:>11.4f} {d32:>11.4f} {d36:>11.4f}\n")
+    print("\n# Piezoelectric Strain(pm/V)\n"
+          "#       d11         d12         d16\n"
+          "#       d21         d22         d26\n"
+          "#       d31         d32         d36\n\n"
+          f"   {d11:>11.4f} {d12:>11.4f} {d16:>11.4f}\n"
+          f"   {d21:>11.4f} {d22:>11.4f} {d26:>11.4f}\n"
+          f"   {d31:>11.4f} {d32:>11.4f} {d36:>11.4f}\n")
 
 
 def run_2d(structure, piezostress_coef, elastic_coef, moduli_index):
@@ -564,23 +563,31 @@ def write_elastic_3d(elastic_3d):
         "#       C15         C25         C35         C45         C55         C56\n"
         "#       C16         C26         C36         C46         C56         C66\n\n"
     )
-    rows = ""
-    for i in range(6):
-        rows += "   " + " ".join(f"{C[i, j]:>11.4f}" for j in range(6)) + "\n"
-
+    rows = (
+        f"   {C[0, 0]:>11.4f} {C[0, 1]:>11.4f} {C[0, 2]:>11.4f} {C[0, 3]:>11.4f} {C[0, 4]:>11.4f} {C[0, 5]:>11.4f}\n"
+        f"   {C[1, 0]:>11.4f} {C[1, 1]:>11.4f} {C[1, 2]:>11.4f} {C[1, 3]:>11.4f} {C[1, 4]:>11.4f} {C[1, 5]:>11.4f}\n"
+        f"   {C[2, 0]:>11.4f} {C[2, 1]:>11.4f} {C[2, 2]:>11.4f} {C[2, 3]:>11.4f} {C[2, 4]:>11.4f} {C[2, 5]:>11.4f}\n"
+        f"   {C[3, 0]:>11.4f} {C[3, 1]:>11.4f} {C[3, 2]:>11.4f} {C[3, 3]:>11.4f} {C[3, 4]:>11.4f} {C[3, 5]:>11.4f}\n"
+        f"   {C[4, 0]:>11.4f} {C[4, 1]:>11.4f} {C[4, 2]:>11.4f} {C[4, 3]:>11.4f} {C[4, 4]:>11.4f} {C[4, 5]:>11.4f}\n"
+        f"   {C[5, 0]:>11.4f} {C[5, 1]:>11.4f} {C[5, 2]:>11.4f} {C[5, 3]:>11.4f} {C[5, 4]:>11.4f} {C[5, 5]:>11.4f}\n"
+    )
+    
     with open('Elastic.dat', 'w') as o:
         o.write(header + rows)
-
-    print("\n# Elastic tensor(GPa)")
-    print("#       C11         C12         C13         C14         C15         C16")
-    print("#       C12         C22         C23         C24         C25         C26")
-    print("#       C13         C23         C33         C34         C35         C36")
-    print("#       C14         C24         C34         C44         C45         C46")
-    print("#       C15         C25         C35         C45         C55         C56")
-    print("#       C16         C26         C36         C46         C56         C66")
-    for i in range(6):
-        print("   " + " ".join(f"{C[i, j]:>11.4f}" for j in range(6)))
-    print()
+    
+    print("\n# Elastic tensor(GPa)\n"
+          "#     C11         C12         C13         C14         C15         C16\n"
+          "#     C12         C22         C23         C24         C25         C26\n"
+          "#     C13         C23         C33         C34         C35         C36\n"
+          "#     C14         C24         C34         C44         C45         C46\n"
+          "#     C15         C25         C35         C45         C55         C56\n"
+          "#     C16         C26         C36         C46         C56         C66\n\n"
+          f"   {C[0, 0]:>11.4f} {C[0, 1]:>11.4f} {C[0, 2]:>11.4f} {C[0, 3]:>11.4f} {C[0, 4]:>11.4f} {C[0, 5]:>11.4f}\n"
+          f"   {C[1, 0]:>11.4f} {C[1, 1]:>11.4f} {C[1, 2]:>11.4f} {C[1, 3]:>11.4f} {C[1, 4]:>11.4f} {C[1, 5]:>11.4f}\n"
+          f"   {C[2, 0]:>11.4f} {C[2, 1]:>11.4f} {C[2, 2]:>11.4f} {C[2, 3]:>11.4f} {C[2, 4]:>11.4f} {C[2, 5]:>11.4f}\n"
+          f"   {C[3, 0]:>11.4f} {C[3, 1]:>11.4f} {C[3, 2]:>11.4f} {C[3, 3]:>11.4f} {C[3, 4]:>11.4f} {C[3, 5]:>11.4f}\n"
+          f"   {C[4, 0]:>11.4f} {C[4, 1]:>11.4f} {C[4, 2]:>11.4f} {C[4, 3]:>11.4f} {C[4, 4]:>11.4f} {C[4, 5]:>11.4f}\n"
+          f"   {C[5, 0]:>11.4f} {C[5, 1]:>11.4f} {C[5, 2]:>11.4f} {C[5, 3]:>11.4f} {C[5, 4]:>11.4f} {C[5, 5]:>11.4f}\n")
 
 
 def write_piezostress_3d(piezostress_3d):
@@ -605,20 +612,22 @@ def write_piezostress_3d(piezostress_3d):
         "#       e21         e22         e23         e24         e25         e26\n"
         "#       e31         e32         e33         e34         e35         e36\n\n"
     )
-    rows = ""
-    for i in range(3):
-        rows += "   " + " ".join(f"{E[i, j]:>11.4f}" for j in range(6)) + "\n"
+    rows = (
+        f"   {E[0, 0]:>11.4f} {E[0, 1]:>11.4f} {E[0, 2]:>11.4f} {E[0, 3]:>11.4f} {E[0, 4]:>11.4f} {E[0, 5]:>11.4f}\n"
+        f"   {E[1, 0]:>11.4f} {E[1, 1]:>11.4f} {E[1, 2]:>11.4f} {E[1, 3]:>11.4f} {E[1, 4]:>11.4f} {E[1, 5]:>11.4f}\n"
+        f"   {E[2, 0]:>11.4f} {E[2, 1]:>11.4f} {E[2, 2]:>11.4f} {E[2, 3]:>11.4f} {E[2, 4]:>11.4f} {E[2, 5]:>11.4f}\n"
+    )
 
     with open('Piezoelectric_Stress.dat', 'w') as o:
         o.write(header + rows)
 
-    print("\n# Piezoelectric Stress(C/m^2)")
-    print("#       e11         e12         e13         e14         e15         e16")
-    print("#       e21         e22         e23         e24         e25         e26")
-    print("#       e31         e32         e33         e34         e35         e36")
-    for i in range(3):
-        print("   " + " ".join(f"{E[i, j]:>11.4f}" for j in range(6)))
-    print()
+    print("\n# Piezoelectric Stress(C/m^2)\n"
+          "#       e11         e12         e13         e14         e15         e16\n"
+          "#       e21         e22         e23         e24         e25         e26\n"
+          "#       e31         e32         e33         e34         e35         e36\n\n"
+          f"   {E[0, 0]:>11.4f} {E[0, 1]:>11.4f} {E[0, 2]:>11.4f} {E[0, 3]:>11.4f} {E[0, 4]:>11.4f} {E[0, 5]:>11.4f}\n"
+          f"   {E[1, 0]:>11.4f} {E[1, 1]:>11.4f} {E[1, 2]:>11.4f} {E[1, 3]:>11.4f} {E[1, 4]:>11.4f} {E[1, 5]:>11.4f}\n"
+          f"   {E[2, 0]:>11.4f} {E[2, 1]:>11.4f} {E[2, 2]:>11.4f} {E[2, 3]:>11.4f} {E[2, 4]:>11.4f} {E[2, 5]:>11.4f}\n")
 
 
 def write_piezostrain_3d(piezostrain_3d):
@@ -643,20 +652,22 @@ def write_piezostrain_3d(piezostrain_3d):
         "#       d21         d22         d23         d24         d25         d26\n"
         "#       d31         d32         d33         d34         d35         d36\n\n"
     )
-    rows = ""
-    for i in range(3):
-        rows += "   " + " ".join(f"{D[i, j]:>11.4f}" for j in range(6)) + "\n"
+    rows = (
+        f"   {D[0, 0]:>11.4f} {D[0, 1]:>11.4f} {D[0, 2]:>11.4f} {D[0, 3]:>11.4f} {D[0, 4]:>11.4f} {D[0, 5]:>11.4f}\n"
+        f"   {D[1, 0]:>11.4f} {D[1, 1]:>11.4f} {D[1, 2]:>11.4f} {D[1, 3]:>11.4f} {D[1, 4]:>11.4f} {D[1, 5]:>11.4f}\n"
+        f"   {D[2, 0]:>11.4f} {D[2, 1]:>11.4f} {D[2, 2]:>11.4f} {D[2, 3]:>11.4f} {D[2, 4]:>11.4f} {D[2, 5]:>11.4f}\n"
+    )
 
     with open('Piezoelectric_Strain.dat', 'w') as o:
         o.write(header + rows)
 
-    print("\n# Piezoelectric Strain(pm/V)")
-    print("#       d11         d12         d13         d14         d15         d16")
-    print("#       d21         d22         d23         d24         d25         d26")
-    print("#       d31         d32         d33         d34         d35         d36")
-    for i in range(3):
-        print("   " + " ".join(f"{D[i, j]:>11.4f}" for j in range(6)))
-    print()
+    print("\n# Piezoelectric Strain(pm/V)\n"
+          "#       d11         d12         d13         d14         d15         d16\n"
+          "#       d21         d22         d23         d24         d25         d26\n"
+          "#       d31         d32         d33         d34         d35         d36\n\n"
+          f"   {D[0, 0]:>11.4f} {D[0, 1]:>11.4f} {D[0, 2]:>11.4f} {D[0, 3]:>11.4f} {D[0, 4]:>11.4f} {D[0, 5]:>11.4f}\n"
+          f"   {D[1, 0]:>11.4f} {D[1, 1]:>11.4f} {D[1, 2]:>11.4f} {D[1, 3]:>11.4f} {D[1, 4]:>11.4f} {D[1, 5]:>11.4f}\n"
+          f"   {D[2, 0]:>11.4f} {D[2, 1]:>11.4f} {D[2, 2]:>11.4f} {D[2, 3]:>11.4f} {D[2, 4]:>11.4f} {D[2, 5]:>11.4f}\n")
 
 
 def run_3d(piezostress_coef, elastic_coef):
