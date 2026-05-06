@@ -22,8 +22,7 @@ PROPERTY_MAP = {
 
 def usage():
     """Print usage information and exit."""
-    
-    text = """
+    print("""
 Usage: plotMechanics <input file> [input file2 ... input file6]
 
 This script plot Young's modulus and Poisson's Ratio as functions of crystal orientation.
@@ -34,8 +33,7 @@ Title can choose by:
 
 This script was inspired by Klichchupong Dabsamut
 and developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
