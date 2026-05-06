@@ -527,7 +527,7 @@ Choices of selecting the drop point of adsorbent
                             select_adsorbent = int(select_adsorbent) - 1
                             break
                         print('WRONG No. of atom in adsorbent!')
-                reference_adsorbent = np.copy(positions_adsorbent[select_adsorbent])
+                reference_adsorbent[:2] = np.copy(positions_adsorbent[select_adsorbent][:2])
                 break
             else:
                 print("ERROR!! Choose again")
@@ -561,12 +561,12 @@ Choices of positioning adsorbent for adsorbent {n+1:>2}
 
         distance[:2] = target[:2] - reference_adsorbent[:2]
         new_positions_adsorbent.append(positions_adsorbent + distance)
-        new_species_adsorbent.append(species_adsorbent)
+        new_species_adsorbent.extend(species_adsorbent)
         if selective_dynamics:
             new_flags_adsorbent.append(flags_adsorbent)
 
     return {"positions_adsorbent": np.vstack(new_positions_adsorbent),
-            "species_adsorbent": np.vstack(new_species_adsorbent),
+            "species_adsorbent": new_species_adsorbent,
             "flags_adsorbent": np.vstack(new_flags_adsorbent) if selective_dynamics else None}
 
 
@@ -662,12 +662,12 @@ Choices of define initial adsorption site
         translate = new_site - reference_adsorbent
 
         new_positions_adsorbent.append(rotate_position_adsorbent + translate)
-        new_species_adsorbent.append(species_adsorbent)
+        new_species_adsorbent.extend(species_adsorbent)
         if selective_dynamics:
             new_flags_adsorbent.append(flags_adsorbent)
 
     return {"positions_adsorbent": np.vstack(new_positions_adsorbent),
-            "species_adsorbent": np.vstack(new_species_adsorbent),
+            "species_adsorbent": new_species_adsorbent,
             "flags_adsorbent": np.vstack(new_flags_adsorbent) if selective_dynamics else None}
 
 
@@ -805,7 +805,7 @@ Method of positioning adsorbent
         else:
             print("ERROR! Wrong choice")
     new_positions_cartesian = np.vstack((substrate["positions_cartesian"], place["positions_adsorbent"]))
-    new_species = np.vstack((substrate["species"], place["species_adsorbent"]))
+    new_species = substrate["species"] + place["species_adsorbent"]
     if selective_dynamics:
         new_flags = np.vstack((flags_substrate, place["flags_adsorbent"]))
     else:
