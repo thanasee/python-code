@@ -6,15 +6,14 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: analyzeShengBTE.py <3ph/4ph>
 
 This script extracts thermal transport data from ShengBTE (and FourPhonon) output files.
 Run from the ShengBTE output directory.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 TENSOR_HEADER     = "#  T(K)        xx          xy          xz          yx          yy          yz          zx          zy          zz"
