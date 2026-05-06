@@ -9,15 +9,14 @@ import h5py as h5
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: analyzePhono3py.py <kappa input> <gruneisen input (optional)>
 
 This script obtain thermal properties form HDF5 files
 some kind of thermal properties obtain at specified temperature
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
@@ -256,7 +255,7 @@ def write_mode_vs_frequency(filepath, frequency, mode_weight, temp_index):
             o.write(FREQ_HEADER + "\n")
             for freq, k in zip(frequency[:, band_index],
                                mode_weight[temp_index, :, band_index, :]):
-                o.write(f" {freq:>10.5f}  {k[0]:>12.3f}  {k[1]:>12.3f}  {k[2]:>12.3f}  {k[3]:>12.3f}  {k[4]:>12.3f}  {k[5]:>12.3f}\n")
+                o.write(f" {freq:>10.5f}  {k[0]:>10.3f}  {k[1]:>10.3f}  {k[2]:>10.3f}  {k[3]:>10.3f}  {k[4]:>10.3f}  {k[5]:>10.3f}\n")
         o.write("\n")
 
 
@@ -281,7 +280,7 @@ def write_mode_vs_mfp(filepath, mean_freepath, mode_weight, temp_index):
             o.write(MFP_HEADER + "\n")
             for mfp, k in zip(mean_freepath[temp_index, :, band_index],
                               mode_weight[temp_index, :, band_index, :]):
-                o.write(f" {mfp:>14.4f}  {k[0]:>12.3f}  {k[1]:>12.3f}  {k[2]:>12.3f}  {k[3]:>12.3f}  {k[4]:>12.3f}  {k[5]:>12.3f}\n")
+                o.write(f" {mfp:>14.4f}  {k[0]:>10.3f}  {k[1]:>10.3f}  {k[2]:>10.3f}  {k[3]:>10.3f}  {k[4]:>10.3f}  {k[5]:>10.3f}\n")
         o.write("\n")
 
 
@@ -306,7 +305,7 @@ def write_nomode_vs_frequency(filepath, sorted_frequency, data, temp_index):
         o.write("# Thermal conductivity(W/m-K) vs Frequency\n")
         o.write(FREQ_HEADER + "\n")
         for freq, k in zip(sorted_frequency, data[temp_index]):
-            o.write(f" {freq:>10.5f}  {k[0]:>12.3f}  {k[1]:>12.3f}  {k[2]:>12.3f}  {k[3]:>12.3f}  {k[4]:>12.3f}  {k[5]:>12.3f}\n")
+            o.write(f" {freq:>10.5f}  {k[0]:>10.3f}  {k[1]:>10.3f}  {k[2]:>10.3f}  {k[3]:>10.3f}  {k[4]:>10.3f}  {k[5]:>10.3f}\n")
         o.write("\n")
 
 
@@ -331,7 +330,7 @@ def write_nomode_vs_mfp(filepath, sorted_mfp, data, temp_index):
         o.write("# Thermal conductivity(W/m-K) vs Mean free path\n")
         o.write(MFP_HEADER + "\n")
         for mfp, k in zip(sorted_mfp[temp_index], data[temp_index]):
-            o.write(f" {mfp:>14.4f}  {k[0]:>12.3f}  {k[1]:>12.3f}  {k[2]:>12.3f}  {k[3]:>12.3f}  {k[4]:>12.3f}  {k[5]:>12.3f}\n")
+            o.write(f" {mfp:>14.4f}  {k[0]:>10.3f}  {k[1]:>10.3f}  {k[2]:>10.3f}  {k[3]:>10.3f}  {k[4]:>10.3f}  {k[5]:>10.3f}\n")
         o.write("\n")
 
 
