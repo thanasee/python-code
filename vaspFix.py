@@ -7,15 +7,14 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: vaspFix.py <input> <output>
 
 This script support VASP5 Structure file format (i.e. POSCAR) 
 for fix atom in Structure file.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
@@ -574,7 +573,7 @@ def select_radius(lattice_matrix, total_atoms, positions_cartesian, species):
     """
     
     targets = parse_group(f"\nChoose reference point\nInput element-symbol and/or atom-indexes to choose ({1:>3} to {total_atoms:>3})\n"
-"(Free-format input, e.g., 1 3 1-4 C H all)", total_atoms, species, allow_all=True)
+                          "(Free-format input, e.g., 1 3 1-4 C H all)", total_atoms, species, allow_all=True)
  
     reference_point = np.mean(positions_cartesian[targets], axis=0)
  
