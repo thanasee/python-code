@@ -7,14 +7,13 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    text = """
+    print("""
 Usage: vaspRotate.py <input> <output>
 
 This script rotate atoms in POSCAR/CONTCAR file.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
