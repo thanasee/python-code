@@ -40,25 +40,25 @@ Scripts in this category post-process force constants and read HDF5 output files
 
 ---
 
-#### `enforceFC.py`
+#### `enforceIFC.py`
 
-Enforces rotational sum rules (Huang and Born-Huang) on second-order force constants (FC2) using [hiPhive](https://hiphive.materialsmodeling.org/), and writes the corrected FC2 in Phonopy-compatible format. Reads `POSCAR` (primitive cell) and `SPOSCAR` (supercell) from the working directory. If no input FC file is found, the script auto-generates one by calling Phonopy on any `vasprun.xml-*` displacement files present in the working directory.
+Enforces rotational sum rules (Huang and Born-Huang) on second-order interatomic force constants (IFC2) using [hiPhive](https://hiphive.materialsmodeling.org/), and writes the corrected IFC2 in Phonopy-compatible format. Reads `POSCAR` (primitive cell) and `SPOSCAR` (supercell) from the working directory. If no input IFC file is found, the script auto-generates one by calling Phonopy on any `vasprun.xml-*` displacement files present in the working directory.
 
 ```
-Usage: enforceFC.py [INPUT_FC_FILE] [OUTPUT_FC_FILE]
+Usage: enforceIFC.py [INPUT_IFC_FILE] [OUTPUT_IFC_FILE]
 ```
 
 File format is auto-detected from the extension: `.hdf5` → HDF5; any other extension → Phonopy text format. Both input and output independently follow this rule. The cutoff radius for the hiPhive cluster space is set to the maximum cutoff supported by the supercell geometry minus a small margin (0.00001 Å).
 
 **Defaults (when arguments are omitted):**
-- `INPUT_FC_FILE` — `FORCE_CONSTANTS` (Phonopy text format)
-- `OUTPUT_FC_FILE` — `<input_basename>_rot` (same format as input; e.g., `FORCE_CONSTANTS_rot` or `FORCE_CONSTANTS_rot.hdf5`)
+- `INPUT_IFC_FILE` — `FORCE_CONSTANTS` (Phonopy text format)
+- `OUTPUT_IFC_FILE` — `<input_basename>_rot` (same format as input; e.g., `FORCE_CONSTANTS_rot` or `FORCE_CONSTANTS_rot.hdf5`)
 
-**Auto-generation of FC file (when `INPUT_FC_FILE` is absent):**
+**Auto-generation of IFC file (when `INPUT_IFC_FILE` is absent):**
 1. If `phonopy_params.yaml` is not present, runs `phonopy --fz vasprun.xml-sposcar <vasprun.xml-*> --sp` to generate it
 2. Runs `phonopy-load phonopy_params.yaml --writefc --full-fc` to write `FORCE_CONSTANTS`
 
-**Output:** One FC2 file with rotational sum rules enforced, ready for use with Phonopy or Phono3py.
+**Output:** One IFC2 file with rotational sum rules enforced, ready for use with Phonopy or Phono3py.
 
 ---
 
