@@ -7,16 +7,14 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-
-    text = """
+    print("""
 Usage: calDistance.py <input>
 
 This script calculate distance between atoms from POSCAR/CONTCAR files.
 
 This script was inspired by Jiraroj T-Thienprasert
 and developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
