@@ -7,15 +7,14 @@ import h5py as h5
 
 def usage():
     """Print usage instructions and exit."""
-    text = """
+    print("""
 Usage: compareIFCs.py <DFT input> <MLFF input>
 
 This script extract interatomic force constant form HDF5 files, which calculated from Phono3py package.
 Autodetect the order of IFCs (2nd or 3rd).
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
