@@ -8,16 +8,14 @@ from ase.io import read
 
 def usage():
     """Print usage information and exit."""
-
-    text = """
+    print("""
 Usage: vaspVibration.py <POSCAR input> <input file> [scaling factor]
 
 This script extracts vibrational modes and writes them in XSF format.
 Supports both VASP (OUTCAR) and Phonopy (band.yaml/mesh.yaml) outputs with write eigenvectors.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
@@ -191,7 +189,7 @@ def write_xsf_modes(structure, modes, scale, is_phonopy):
     total_modes = modes.shape[0]
     total_atoms = len(structure)
     symbols     = structure.get_chemical_symbols()
-
+    place       = len(str(total_modes))
     if modes.shape[1] != total_atoms:
         print("ERROR!\nShape mismatch between eigenvectors and atomic positions.")
         exit(0)
@@ -201,7 +199,7 @@ def write_xsf_modes(structure, modes, scale, is_phonopy):
         positions_vector = np.hstack((structure.positions, vector))
 
         mode_index  = j + 1 if is_phonopy else total_modes - j
-        output_name = f"mode_{mode_index:d}.xsf"
+        output_name = f"mode_{str(mode_index).zfill(place)}.xsf"
 
         with open(output_name, 'w') as o:
             o.write("CRYSTAL\n")
