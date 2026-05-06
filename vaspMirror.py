@@ -7,16 +7,14 @@ import numpy as np
 
 def usage():
     """Print usage information and exit."""
-    
-    text = """
+    print("""
 Usage: vaspMirror.py <input> <output>
 
 This script support VASP5 Structure file format (i.e. POSCAR) 
 for reflect Structure file along cartesian coordinates.
 
 This script was developed by Thanasee Thanasarnsurapong.
-"""
-    print(text)
+""")
     exit(0)
 
 
