@@ -23,6 +23,7 @@ Stress conversion:
 
 This script was developed by Thanasee Thanasarnsurapong.
 """)
+    exit(0)
 
 
 def read_lines(input_file):
@@ -456,7 +457,6 @@ def main():
     """Parse arguments, convert to extended XYZ format, and write output"""
     if '-h' in argv or '--help' in argv or len(argv) != 3:
         usage()
-        exit(0)
 
     input_file = argv[1]
     output_file = argv[2]
