@@ -11,7 +11,7 @@ def usage():
     print("""
 Usage: vaspVibration.py <POSCAR input> <input file> [scaling factor]
 
-This script extracts vibrational modes and writes them in XSF format.
+This script extracts vibrational modes at \u0393 and writes them in XSF format.
 Supports both VASP (OUTCAR) and Phonopy (band.yaml/mesh.yaml) outputs with write eigenvectors.
 
 This script was developed by Thanasee Thanasarnsurapong.
