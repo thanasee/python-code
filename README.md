@@ -27,7 +27,7 @@ All scripts are standalone CLI tools written in Python using NumPy as the primar
 - h5py
 - matplotlib
 - ASE — Atomic Simulation Environment
-- hiPhive (for `enforceFC.py`)
+- hiPhive (for `enforceIFC.py`)
 - Phonopy/Phono3py (as data source; not imported directly)
 
 ---
@@ -61,7 +61,6 @@ File format is auto-detected from the extension: `.hdf5` → HDF5; any other ext
 **Output:** One IFC2 file with rotational sum rules enforced, ready for use with Phonopy or Phono3py.
 
 ---
-
 
 #### `convergePhono3py.py`
 
