@@ -45,7 +45,7 @@ Scripts in this category post-process force constants and read HDF5 output files
 Enforces rotational sum rules (Huang and Born-Huang) on second-order interatomic force constants (IFC2) using [hiPhive](https://hiphive.materialsmodeling.org/), and writes the corrected IFC2 in Phonopy-compatible format. Reads `POSCAR` (primitive cell) and `SPOSCAR` (supercell) from the working directory. If no input IFC file is found, the script auto-generates one by calling Phonopy on any `vasprun.xml-*` displacement files present in the working directory.
 
 ```
-Usage: enforceIFC.py [INPUT_IFC_FILE] [OUTPUT_IFC_FILE]
+Usage: enforceIFC.py <input FORCE_CONSTANTS> <output FORCE_CONSTANTS>
 ```
 
 File format is auto-detected from the extension: `.hdf5` → HDF5; any other extension → Phonopy text format. Both input and output independently follow this rule. The cutoff radius for the hiPhive cluster space is set to the maximum cutoff supported by the supercell geometry minus a small margin (0.00001 Å).
@@ -67,7 +67,7 @@ File format is auto-detected from the extension: `.hdf5` → HDF5; any other ext
 Reads the high-symmetry q-point path positions from a `band.dat` file produced by `phonopy-bandplot --gnuplot` and writes `QLINES.dat` — a boundary-line file in the same format as `KLINES.dat` from VASPKIT, suitable for overlaying q-path tick marks and the frequency window on a phonon band structure plot in xmgrace or gnuplot.
 
 ```
-Usage: getQPATH.py <band.dat input>
+Usage: getQPATH.py <input band.dat>
 ```
 
 Q-point path distances (1/Å) are read from the second line of the input file. The frequency range is determined automatically as floor(f_min) to ceil(f_max) from all frequency values in the file. For each interior high-symmetry q-point, three coordinate pairs are written to trace a vertical tick from `fmin` to `fmax` and back. The outer box boundaries and the zero-frequency axis are appended at the end.
