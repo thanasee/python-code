@@ -25,10 +25,11 @@ All scripts are standalone CLI tools written in Python using NumPy as the primar
 - Python 3.8+
 - NumPy
 - h5py
+- Yaml
 - matplotlib
 - ASE — Atomic Simulation Environment
-- hiPhive (for `enforceIFC.py`)
-- Phonopy/Phono3py (as data source; not imported directly)
+- hiPhive
+- Phonopy/Phono3py
 
 ---
 
