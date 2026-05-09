@@ -7,7 +7,7 @@ import numpy as np
 def usage():
     """Print usage information and exit."""
     print("""
-Usage: getQPATH.py <band.dat input>
+Usage: getQPATH.py <input band.dat>
 
 This script read second line in band.dat file
 which generated from phonopy-bandplot --gnuplot command
