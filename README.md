@@ -27,7 +27,7 @@ All scripts are standalone CLI tools written in Python using NumPy as the primar
 - h5py
 - PyYAML
 - matplotlib
-- ASE
+- ASE — Atomic Simulation Environment
 - hiPhive
 - Phonopy/Phono3py
 
