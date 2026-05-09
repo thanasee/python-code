@@ -51,8 +51,8 @@ Usage: enforceIFC.py <input FORCE_CONSTANTS> <output FORCE_CONSTANTS>
 File format is auto-detected from the extension: `.hdf5` → HDF5; any other extension → Phonopy text format. Both input and output independently follow this rule. The cutoff radius for the hiPhive cluster space is set to the maximum cutoff supported by the supercell geometry minus a small margin (0.00001 Å).
 
 **Defaults (when arguments are omitted):**
-- `INPUT_IFC_FILE` — `FORCE_CONSTANTS` (Phonopy text format)
-- `OUTPUT_IFC_FILE` — `<input_basename>_rot` (same format as input; e.g., `FORCE_CONSTANTS_rot` or `FORCE_CONSTANTS_rot.hdf5`)
+- `input FORCE_CONSTANTS` — `FORCE_CONSTANTS` (Phonopy text format)
+- `output FORCE_CONSTANTS` — `<input_basename>_rot` (same format as input; e.g., `FORCE_CONSTANTS_rot` or `FORCE_CONSTANTS_rot.hdf5`)
 
 **Auto-generation of IFC file (when `INPUT_IFC_FILE` is absent):**
 1. If `phonopy_params.yaml` is not present, runs `phonopy --fz vasprun.xml-sposcar <vasprun.xml-*> --sp` to generate it
