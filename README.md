@@ -315,10 +315,10 @@ Accepts 3 values (diagonal strain) or 9 values (full 3×3 tensor). Off-diagonal 
 
 #### `vaspStack.py`
 
-Generates bilayer and heterostructure POSCAR files from one or two input POSCAR files by stacking along the c-axis.
+Generates bilayer POSCAR files from an input POSCAR file by stacking along the c-axis.
 
 ```
-Usage: vaspStack.py <POSCAR> [POSCAR2]
+Usage: vaspStack.py <POSCAR>
 ```
 
 Features: lattice compatibility checking (`check_lattice`), 2D Bravais lattice type detection, high-symmetry stacking shift grids per lattice type, mirror-flip of the second layer, and a summary `STACK_LIST.txt` of all generated POSCARs.
