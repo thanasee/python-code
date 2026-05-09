@@ -54,7 +54,7 @@ File format is auto-detected from the extension: `.hdf5` → HDF5; any other ext
 - `input FORCE_CONSTANTS` — `FORCE_CONSTANTS` (Phonopy text format)
 - `output FORCE_CONSTANTS` — `<input_basename>_rot` (same format as input; e.g., `FORCE_CONSTANTS_rot` or `FORCE_CONSTANTS_rot.hdf5`)
 
-**Auto-generation of IFC file (when `INPUT_IFC_FILE` is absent):**
+**Auto-generation of IFC file (when `input FORCE_CONSTANTS` is absent):**
 1. If `phonopy_params.yaml` is not present, runs `phonopy --fz vasprun.xml-sposcar <vasprun.xml-*> --sp` to generate it
 2. Runs `phonopy-load phonopy_params.yaml --writefc --full-fc` to write `FORCE_CONSTANTS`
 
