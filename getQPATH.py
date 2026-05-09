@@ -100,8 +100,6 @@ def write_QLINES(q_points, fmin, fmax, output_path="QLINES.dat"):
         # Zero-frequency axis
         o.write(f"{q_points[0]:12.8f}{0.0:13.6f}\n")
         o.write(f"{q_points[-1]:12.8f}{0.0:13.6f}\n")
- 
-    print(f"Written: {output_path}")
 
 
 def main():
