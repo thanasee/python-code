@@ -25,7 +25,7 @@ All scripts are standalone CLI tools written in Python using NumPy as the primar
 - Python 3.8+
 - NumPy
 - h5py
-- Yaml
+- PyYAML
 - matplotlib
 - ASE — Atomic Simulation Environment
 - hiPhive
