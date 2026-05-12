@@ -10,7 +10,7 @@ def usage():
     """Print usage information and exit."""
 
     print("""
-Usage: vaspBornCharge.py <OUTCAR or vasprun.xml>
+Usage: vaspBorn.py <OUTCAR or vasprun.xml>
 
 This script reads a VASP OUTCAR or vasprun.xml file and extracts:
   - Static (ion-clamped) dielectric tensor
