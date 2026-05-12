@@ -24,11 +24,10 @@ This script was developed by Thanasee Thanasarnsurapong.
 def read_OUTCAR(filepath):
     """Read Born effective charges and static dielectric tensor from OUTCAR.
 
-    Parses the OUTCAR written by a VASP DFPT run (IBRION=8,
-    LEPSILON=.TRUE.).  The ion-clamped (electronic) dielectric tensor is
-    taken from the ``MACROSCOPIC STATIC DIELECTRIC TENSOR`` block that
-    appears *before* the ionic contributions.  Born effective charges are
-    read from the ``BORN EFFECTIVE CHARGES`` block.
+    Parses the OUTCAR written by a VASP DFPT run (LEPSILON=.TRUE.).
+    The ion-clamped (electronic) dielectric tensor is read from the
+    ``MACROSCOPIC STATIC DIELECTRIC TENSOR`` block.  Born effective
+    charges are read from the ``BORN EFFECTIVE CHARGES`` block.
 
     Parameters
     ----------
@@ -38,7 +37,7 @@ def read_OUTCAR(filepath):
     Returns
     -------
     dielectric : numpy.ndarray, shape (3, 3)
-        Static (ion-clamped + ionic) dielectric tensor, dimensionless.
+        Ion-clamped dielectric tensor, dimensionless.
     born_charges : numpy.ndarray, shape (NIONS, 3, 3)
         Born effective charge tensor for each ion, in units of
         elementary charge (e).
@@ -49,11 +48,8 @@ def read_OUTCAR(filepath):
     with open(filepath, 'r') as f:
         lines = f.readlines()
 
-    # ── Collect all dielectric tensor blocks ─────────────────────────────────
-    # VASP writes two: (1) ion-clamped, (2) ion-clamped + ionic.
-    # Phono3py expects the full static tensor (including ionic contribution),
-    # which is the LAST occurrence.
-    dielectric_blocks = []
+    # ── Dielectric tensor ─────────────────────────────────────────────────────
+    dielectric = None
     i = 0
     while i < len(lines):
         if 'MACROSCOPIC STATIC DIELECTRIC TENSOR' in lines[i]:
@@ -69,16 +65,14 @@ def read_OUTCAR(filepath):
                         pass
                 j += 1
             if len(block) == 3:
-                dielectric_blocks.append(np.array(block))
+                dielectric = np.array(block)
+                break
         i += 1
 
-    if not dielectric_blocks:
+    if dielectric is None:
         print("ERROR!\nNo dielectric tensor found in OUTCAR.\n"
-              "Make sure the calculation used IBRION=8 and LEPSILON=.TRUE.")
+              "Make sure the calculation used LEPSILON=.TRUE.")
         exit(1)
-
-    # Use the last occurrence (includes ionic contribution)
-    dielectric = dielectric_blocks[-1]
 
     # ── Born effective charges ────────────────────────────────────────────────
     born_charges = []
@@ -120,7 +114,7 @@ def read_OUTCAR(filepath):
 
     if not born_charges:
         print("ERROR!\nNo Born effective charges found in OUTCAR.\n"
-              "Make sure the calculation used IBRION=8 and LEPSILON=.TRUE.")
+              "Make sure the calculation used LEPSILON=.TRUE.")
         exit(1)
 
     nions = len(born_charges)
@@ -132,8 +126,10 @@ def read_OUTCAR(filepath):
 def read_vasprun(filepath):
     """Read Born effective charges and static dielectric tensor from vasprun.xml.
 
-    Parses the ``<dielectricfunction>`` and ``<born_charges>`` sections of
-    the vasprun.xml produced by a VASP DFPT run (IBRION=8, LEPSILON=.TRUE.).
+    Parses the vasprun.xml produced by a VASP DFPT run (LEPSILON=.TRUE.).
+    The ion-clamped (electronic) dielectric tensor is read from the
+    ``<varray name="epsilon">`` block.  Born effective charges are read
+    from the ``<array name="born_charges">`` block.
 
     Parameters
     ----------
@@ -143,7 +139,7 @@ def read_vasprun(filepath):
     Returns
     -------
     dielectric : numpy.ndarray, shape (3, 3)
-        Static dielectric tensor (ion-clamped + ionic), dimensionless.
+        Ion-clamped dielectric tensor, dimensionless.
     born_charges : numpy.ndarray, shape (NIONS, 3, 3)
         Born effective charge tensor for each ion, in units of
         elementary charge (e).
@@ -160,40 +156,19 @@ def read_vasprun(filepath):
     root = tree.getroot()
 
     # ── Dielectric tensor ─────────────────────────────────────────────────────
-    # vasprun.xml contains <dielectricfunction> with children <epsilon> (real)
-    # and possibly <epsilon_ion>.  The full static tensor is the sum of the
-    # electronic part and the ionic contribution.  We look for the array named
-    # "density" inside the <dielectricfunction> block.
-    # Alternatively, the <array name="epsilon"> under <calculation> holds the
-    # ion-clamped tensor and <array name="epsilon_ion"> the ionic part.
+    # <varray name="epsilon"> holds the ion-clamped (electronic) dielectric
+    # tensor written by LEPSILON=.TRUE.
     dielectric = None
 
-    # Strategy: find the last <varray name="epsilon"> and <varray name="epsilon_ion">
-    # and sum them.  If only one exists, use that.
-    eps_electronic = None
-    eps_ionic = None
-
     for varray in root.iter('varray'):
-        name = varray.get('name', '')
-        if name == 'epsilon':
+        if varray.get('name') == 'epsilon':
             rows = []
             for v in varray.findall('v'):
                 rows.append([float(x) for x in v.text.split()])
             if len(rows) == 3:
-                eps_electronic = np.array(rows)
-        elif name == 'epsilon_ion':
-            rows = []
-            for v in varray.findall('v'):
-                rows.append([float(x) for x in v.text.split()])
-            if len(rows) == 3:
-                eps_ionic = np.array(rows)
+                dielectric = np.array(rows)
 
-    if eps_electronic is not None and eps_ionic is not None:
-        dielectric = eps_electronic + eps_ionic
-    elif eps_electronic is not None:
-        dielectric = eps_electronic
-        print("Note: Only electronic dielectric tensor found (no ionic part).")
-    else:
+    if dielectric is None:
         print("ERROR!\nNo dielectric tensor found in vasprun.xml.\n"
               "Make sure the calculation used LEPSILON=.TRUE.")
         exit(1)
