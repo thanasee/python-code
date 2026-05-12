@@ -8,7 +8,7 @@ A collection of Python scripts for VASP output analysis and related tasks, devel
 
 ## Overview
 
-This repository is organized into four functional categories:
+This repository is organized into five functional categories:
 
 1. **Thermal transport analysis** — post-process force constants, reconnect phonon branches, generate phonon band plot boundaries, extract and analyze lattice thermal conductivity variables from Phono3py HDF5 output files and ShengBTE output files
 2. **Structural analysis** — calculate structural properties (e.g., bond distances) from VASP POSCAR/CONTCAR files
