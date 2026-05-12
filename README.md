@@ -8,13 +8,14 @@ A collection of Python scripts for VASP output analysis and related tasks, devel
 
 ## Overview
 
-This repository is organized into five functional categories:
+This repository is organized into six functional categories:
 
 1. **Thermal transport analysis** — post-process force constants, reconnect phonon branches, generate phonon band plot boundaries, extract and analyze lattice thermal conductivity variables from Phono3py HDF5 output files and ShengBTE output files
 2. **Structural analysis** — calculate structural properties (e.g., bond distances) from VASP POSCAR/CONTCAR files
 3. **Mechanical properties** — extract and plot elastic tensors, piezoelectric tensors, and related quantities from VASP output files
 4. **Structure preparation** — generate and manipulate POSCAR files for various VASP calculations
 5. **MLFF utilities** — monitor training errors, evaluate MLFF accuracy against DFT references, and convert or merge VASP `ML_AB` training data files
+6. **Dielectric & polar properties** — extract dielectric tensors and Born effective charge tensors from VASP DFPT output files
 
 All scripts are standalone CLI tools written in Python using NumPy as the primary dependency. Each follows a consistent modular design with a `main()` entry point and NumPy-style docstrings.
 
@@ -474,6 +475,26 @@ Usage: mergeMLAB.py <ML_AB 1> <ML_AB 2> [ML_AB 3 ...] <output ML_AB>
 ```
 
 Resolves header metadata conflicts (reference energies, atomic masses) by first-file-wins with a warning for mismatches.
+
+---
+
+### 6. Dielectric & Polar Properties
+
+Scripts for extracting dielectric and Born effective charge tensors from VASP DFPT output files.
+
+---
+
+#### `vaspBorn.py`
+
+Extracts the static dielectric tensor and Born effective charge tensors from a VASP DFPT calculation (`LEPSILON=.TRUE.`) and writes them to `INCAR.LR`. Accepts either `OUTCAR` or `vasprun.xml`; file type is auto-detected by filename with content-based fallback.
+
+```
+Usage: vaspBorn.py <OUTCAR or vasprun.xml>
+```
+
+The dielectric tensor is the full static tensor (ion-clamped + ionic). For `vasprun.xml`, the electronic and ionic parts are summed; a warning is printed if only the electronic part is found.
+
+**Output:** `INCAR.LR` — `PHON_DIELECTRIC` and `PHON_BORN_CHARGES` tags in backslash-continuation format.
 
 ---
 
