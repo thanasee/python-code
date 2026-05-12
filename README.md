@@ -486,13 +486,11 @@ Scripts for extracting dielectric and Born effective charge tensors from VASP DF
 
 #### `vaspBorn.py`
 
-Extracts the static dielectric tensor and Born effective charge tensors from a VASP DFPT calculation (`LEPSILON=.TRUE.`) and writes them to `INCAR.LR`. Accepts either `OUTCAR` or `vasprun.xml`; file type is auto-detected by filename with content-based fallback.
+Extracts the ion-clamped (electronic) dielectric tensor and Born effective charge tensors from a VASP DFPT calculation (`LEPSILON=.TRUE.`) and writes them to `INCAR.LR`. Accepts either `OUTCAR` or `vasprun.xml`; file type is auto-detected by filename with content-based fallback.
 
 ```
 Usage: vaspBorn.py <OUTCAR or vasprun.xml>
 ```
-
-The dielectric tensor is the full static tensor (ion-clamped + ionic). For `vasprun.xml`, the electronic and ionic parts are summed; a warning is printed if only the electronic part is found.
 
 **Output:** `INCAR.LR` — `PHON_DIELECTRIC` and `PHON_BORN_CHARGES` tags in backslash-continuation format.
 
