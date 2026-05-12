@@ -158,6 +158,18 @@ Output filenames follow the pattern `<tag>-mXXXXXX.dat`, where the mesh token is
 
 ---
 
+#### `poscar2control.py`
+
+Converts a VASP POSCAR file into a CONTROL input file for the [ShengBTE](https://www.shengbte.org/) lattice thermal conductivity code (Fortran BTE solver).
+
+```
+Usage: poscar2control.py <POSCAR>
+```
+
+Interactively prompts for supercell matrix and phonon process order (3-phonon or 4-phonon, with CPU/GPU branching). Sets `lfactor=0.1` (Å → nm) as required by ShengBTE. **Output:** `CONTROL.initial`
+
+---
+
 #### `analyzeShengBTE.py`
 
 Extracts thermal transport properties from [ShengBTE](https://www.shengbte.org/) output files and writes output files suitable for plotting in xmgrace or matplotlib. If `4ph` is specified, all [FourPhonon](https://github.com/FourPhonon/FourPhonon) four-phonon scattering quantities are also extracted. Run from the ShengBTE output directory.
@@ -292,7 +304,7 @@ Scripts for generating, transforming, and manipulating VASP POSCAR files for var
 
 #### `vaspSupercell.py`
 
-Generates a supercell POSCAR from a unit cell input using a 3×3 expansion matrix.
+Generates a supercell POSCAR from a unit cell input using an expansion matrix. Accepts 3 values (diagonal expansion) or 9 values (full 3×3 matrix).
 
 ```
 Usage: vaspSupercell.py <POSCAR> <output POSCAR>
@@ -407,18 +419,6 @@ Converts a VASP POSCAR/CONTCAR to standardized VASP5 format, with optional Selec
 ```
 Usage: vaspReformat.py <POSCAR> <output POSCAR>
 ```
-
----
-
-#### `poscar2control.py`
-
-Converts a VASP POSCAR file into a CONTROL input file for the [ShengBTE](https://www.shengbte.org/) lattice thermal conductivity code (Fortran BTE solver).
-
-```
-Usage: poscar2control.py <POSCAR>
-```
-
-Interactively prompts for supercell matrix and phonon process order (3-phonon or 4-phonon, with CPU/GPU branching). Sets `lfactor=0.1` (Å → nm) as required by ShengBTE. **Output:** `CONTROL.initial`
 
 ---
 
