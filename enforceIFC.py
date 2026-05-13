@@ -4,7 +4,6 @@ import os
 import subprocess
 from sys import argv, exit
 from glob import glob
-import h5py
 from ase.io import read
 from hiphive import ClusterSpace, ForceConstantPotential, enforce_rotational_sum_rules
 from hiphive.force_constants import ForceConstants
