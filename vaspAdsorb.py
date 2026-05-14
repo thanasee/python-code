@@ -408,6 +408,30 @@ def selection_atoms(prompt, total_atoms, species):
         print("Wrong input atom-indexes! TRY AGAIN!")
 
 
+def unwrap(positions_direct):
+    """Reconstruct a contiguous cluster by unwrapping periodic boundary conditions.
+
+    Shifts all atoms into the minimum-image frame relative to atom[0], so that
+    atoms split across a cell boundary are treated as geometrically contiguous.
+    Interatomic distances are preserved exactly.
+
+    Parameters
+    ----------
+    positions_direct : np.ndarray (N, 3) — fractional coordinates in [0, 1)
+
+    Returns
+    -------
+    reference : np.ndarray (3,)   — fractional coordinate of atom[0]
+    unwrapped : np.ndarray (N, 3) — unwrapped fractional coordinates
+    """
+    
+    reference = np.copy(positions_direct[0])
+    delta = positions_direct - reference
+    delta -= np.round(delta)
+    
+    return reference, reference + delta
+
+
 def input_direct(lattice_matrix):
     """Prompt the user for a position in fractional (a, b) coordinates and convert to Cartesian.
 
@@ -525,7 +549,7 @@ Choices of selecting the drop point of adsorbent
                             select_adsorbent = int(select_adsorbent) - 1
                             break
                         print('WRONG No. of atom in adsorbent!')
-                reference_adsorbent[:2] = np.copy(positions_adsorbent[select_adsorbent][:2])
+                reference_adsorbent[:2] = positions_adsorbent[select_adsorbent][:2]
                 break
             else:
                 print("ERROR!! Choose again")
@@ -549,7 +573,10 @@ Choices of positioning adsorbent for adsorbent {n+1:>2}
                           f"({1:>3} to {total_atoms_substrate:>3})\n"
                           f"(Free-format input, e.g., 1 3 1-4 C H all)")
                 selected_atoms = selection_atoms(prompt, total_atoms_substrate, species_substrate)
-                target = np.mean(positions_substrate[selected_atoms], axis=0)
+                selected_positions_direct = cartesian_to_direct(lattice_matrix_substrate, positions_substrate[selected_atoms])
+                _, selected_positions_unwrapped = unwrap(selected_positions_direct)
+                centroid_direct = np.mean(selected_positions_unwrapped, axis=0)
+                target = centroid_direct @ lattice_matrix_substrate
                 break
             elif option_position == '2':
                 target = input_direct(lattice_matrix_substrate)
@@ -623,17 +650,20 @@ Choices of define initial adsorption site
             prompt = (f"\nInput element-symbol and/or atom-indexes to choose "
                       f"({1:>3} to {total_atoms_substrate:>3})\n"
                       f"(Free-format input, e.g., 1 3 1-4 C H all)")
-            targets = selection_atoms(prompt, total_atoms_substrate, species_substrate)
-            target_site = np.mean(positions_substrate[targets], axis=0)
+            selected_atoms = selection_atoms(prompt, total_atoms_substrate, species_substrate)
+            selected_positions_direct = cartesian_to_direct(lattice_matrix_substrate, positions_substrate[selected_atoms])
+            _, selected_positions_unwrapped = unwrap(selected_positions_direct)
+            centroid_direct = np.mean(selected_positions_unwrapped, axis=0)
+            target_initial = centroid_direct @ lattice_matrix_substrate
             break
         elif option_site == '2':
-            target_site = input_direct(lattice_matrix_substrate)
+            target_initial = input_direct(lattice_matrix_substrate)
             break
         else:
             print("ERROR!! Choose again")
 
     # Compute initial displacement direction
-    xy_distance = target_site[:2] - target_center[:2]
+    xy_distance = target_initial[:2] - target_center[:2]
     norm = np.linalg.norm(xy_distance)
     if norm == 0:
         print("ERROR! Initial site cannot be the same as the target atom.")
