@@ -146,7 +146,7 @@ Extracts mode-resolved thermal transport properties from a single Phono3py `kapp
 Usage: analyzePhono3py.py <kappa HDF5 file> <gruneisen HDF5 file (optional)>
 ```
 
-Output filenames follow the pattern `<tag>-mXXXXXX.dat`, where the mesh token is preserved from the input filename (e.g., `kappa-m111111.hdf5` → `KappaVsT-m111111.dat`). All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/m-K.
+Output filenames follow the pattern `<tag>-mXXXXXX.dat`, where the mesh token is preserved from the input filename (e.g., `kappa-m111111.hdf5` → `KappaVsT-m111111.dat`). All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/(m·K).
 
 **2D renormalization:** After loading the HDF5 file, the script interactively prompts for dimensionality (1 = 3D, 2 = 2D). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ arrays before any output is written, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/(m·K) throughout. The renormalization applies to all output file groups below.
 
@@ -400,7 +400,7 @@ Applies Selective Dynamics constraints to a VASP POSCAR, fixing atoms in specifi
 Usage: vaspFix.py <POSCAR> <output POSCAR>
 ```
 
-Three atom-selection modes: by index/label, by cutoff radius (PBC-aware), or from an existing `SELECTED_FIX_ATOMS_LIST` file. Write a `SELECTED_FIX_ATOMS_LIST` log for reference and reuse.
+Three atom-selection modes: by index/label, by cutoff radius (PBC-aware), or from an existing `SELECTED_FIX_ATOMS_LIST` file, and then writes a `SELECTED_FIX_ATOMS_LIST` log for reference and reuse.
 
 ---
 
