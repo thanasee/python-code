@@ -310,7 +310,7 @@ Usage: ElasticTensor2D.py pre  <structure file>   # Generate strained POSCARs
 
 #### `vaspPiezoelectric.py`
 
-Extracts the piezoelectric stress tensor (e, C/m^2) and elastic stiffness tensor (C, GPa or N/m) from a VASP `OUTCAR` and computes the piezoelectric strain tensor (d = e · S, pm/V) via the compliance tensor S = inverse(C).
+Extracts the piezoelectric stress tensor (e, C/m^2) and elastic stiffness tensor (C, GPa or N/m) from a VASP `OUTCAR` and computes the piezoelectric strain tensor (**d** = **e**·**S**, pm/V) via the compliance tensor **S** = **C**<sup>-1</sup>.
 
 ```
 Usage: vaspPiezoelectric.py <OUTCAR>
@@ -412,7 +412,7 @@ Applies a strain tensor to a crystal structure POSCAR for DFT elastic constant c
 Usage: vaspStrain.py <POSCAR> <output POSCAR>
 ```
 
-Accepts 3 values (diagonal strain) or 9 values (full 3×3 tensor). Off-diagonal inputs are symmetrized. Applies the deformation gradient F = I + ε to the lattice matrix, preserving fractional atomic coordinates.
+Accepts 3 values (diagonal strain) or 9 values (full 3×3 tensor). Off-diagonal inputs are symmetrized. Applies the deformation gradient **F** = **I** + **ε** to the lattice matrix, preserving fractional atomic coordinates.
 
 ---
 
