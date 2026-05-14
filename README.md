@@ -11,10 +11,10 @@ A collection of Python scripts for VASP output analysis and related tasks, devel
 This repository is organized into six functional categories:
 
 1. **Thermal transport analysis** — post-process force constants, reconnect phonon branches, generate phonon band plot boundaries, extract and analyze lattice thermal conductivity variables from Phono3py HDF5 output files and ShengBTE output files
-2. **Structural analysis** — calculate structural properties (e.g., bond distances) from VASP POSCAR/CONTCAR files
+2. **Structural analysis** — calculate structural properties (e.g., bond distances) and extract vibrational normal modes from VASP POSCAR/CONTCAR and output files
 3. **Mechanical properties** — extract and plot elastic tensors, piezoelectric tensors, and related quantities from VASP output files
 4. **Structure preparation** — generate and manipulate POSCAR files for various VASP calculations
-5. **MLFF utilities** — monitor training errors, evaluate MLFF accuracy against DFT references, and convert or merge VASP `ML_AB` training data files
+5. **MLFF utilities** — monitor training errors, evaluate MLFF accuracy against DFT references, and convert or merge VASP's ML_AB` training data files
 6. **Dielectric & polar properties** — extract dielectric tensors and Born effective charge tensors from VASP DFPT output files
 
 All scripts are standalone CLI tools written in Python using NumPy as the primary dependency. Each follows a consistent modular design with a `main()` entry point and NumPy-style docstrings.
@@ -64,17 +64,31 @@ File format is auto-detected from the extension: `.hdf5` → HDF5; any other ext
 
 ---
 
-#### `getQPATH.py`
+#### `calRMS.py`
 
-Reads the high-symmetry q-point path positions from a `band.dat` file produced by `phonopy-bandplot --gnuplot` and writes `QLINES.dat` — a boundary-line file in the same format as `KLINES.dat` from VASPKIT, suitable for overlaying q-path tick marks and the frequency window on a phonon band structure plot in xmgrace or gnuplot.
+Computes the RMS of each 3×3 IFC block from a Phonopy `FORCE_CONSTANTS` file and pairs it with the corresponding minimum-image interatomic distance from a POSCAR. Useful for visualizing how IFC strength decays with distance for each element pair.
 
 ```
-Usage: getQPATH.py <input band.dat>
+Usage: calRMS.py <POSCAR> <FORCE_CONSTANTS>
 ```
 
-Q-point path distances (1/Å) are read from the second line of the input file. The frequency range is determined automatically as floor(f_min) to ceil(f_max) from all frequency values in the file. For each interior high-symmetry q-point, three coordinate pairs are written to trace a vertical tick from `fmin` to `fmax` and back. The outer box boundaries and the zero-frequency axis are appended at the end.
+All distances are computed under periodic boundary conditions using the minimum-image convention. Results are written as one file per unique element pair, sorted by ascending distance.
 
-**Output:** `QLINES.dat` — columns: q-path distance (1/Å), frequency boundary (THz).
+**Output:** `RMS_A-B.dat` per element pair — columns: distance (Å), IFC RMS (eV/Å<sup>2</sup>).
+
+---
+
+#### `compareIFCs.py`
+
+Compares interatomic force constants (IFCs) between DFT and MLFF calculations by reading Phono3py HDF5 files and writing the residual (MLFF − DFT) to `.dat` files. Auto-detects whether the file contains 2nd-order (`force_constants`) or 3rd-order (`fc3`) IFCs.
+
+```
+Usage: compareIFCs.py <DFT's force constants HDF5 input> <MLFF's force constants HDF5 input>
+```
+
+**Output files:**
+- `2ndIFCs.dat` — 2nd-order IFC comparison in eV/Å<sup>2</sup>
+- `3rdIFCs.dat` — 3rd-order IFC comparison in eV/Å<sup>3</sup>
 
 ---
 
@@ -96,17 +110,17 @@ The reordered data is written to a new `band.yaml` in the same format as the Pho
 
 ---
 
-#### `compareIFCs.py`
+#### `getQPATH.py`
 
-Compares interatomic force constants (IFCs) between DFT and MLFF calculations by reading Phono3py HDF5 files and writing the residual (MLFF − DFT) to `.dat` files. Auto-detects whether the file contains 2nd-order (`force_constants`) or 3rd-order (`fc3`) IFCs.
+Reads the high-symmetry q-point path positions from a `band.dat` file produced by `phonopy-bandplot --gnuplot` and writes `QLINES.dat` — a boundary-line file in the same format as `KLINES.dat` from VASPKIT, suitable for overlaying q-path tick marks and the frequency window on a phonon band structure plot in xmgrace or gnuplot.
 
 ```
-Usage: compareIFCs.py <DFT's force constants HDF5 input> <MLFF's force constants HDF5 input>
+Usage: getQPATH.py <input band.dat>
 ```
 
-**Output files:**
-- `2ndIFCs.dat` — 2nd-order IFC comparison in eV/Å^2
-- `3rdIFCs.dat` — 3rd-order IFC comparison in eV/Å^3
+Q-point path distances (1/Å) are read from the second line of the input file. The frequency range is determined automatically as floor(f_min) to ceil(f_max) from all frequency values in the file. For each interior high-symmetry q-point, three coordinate pairs are written to trace a vertical tick from `fmin` to `fmax` and back. The outer box boundaries and the zero-frequency axis are appended at the end.
+
+**Output:** `QLINES.dat` — columns: q-path distance (1/Å), frequency boundary (THz).
 
 ---
 
@@ -120,7 +134,7 @@ Usage: convergePhono3py.py
 
 Automatically scans for all `kappa-m*.hdf5` files, sorts them by mesh number, and writes convergence data. Supports all Phono3py calculation modes: `--br`, `--lbte`, `--wigner`, and their combinations (`kappa`, `kappa_RTA`, `kappa_C`, `kappa_P_RTA`, `kappa_TOT_RTA`, `kappa_P_exact`, `kappa_TOT_exact`).
 
-**2D renormalization:** After loading the HDF5 files, the script interactively prompts for dimensionality (1 = 3D, 2 = 2D). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ values, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/m-K throughout.
+**2D renormalization:** After loading the HDF5 files, the script interactively prompts for dimensionality (1 = 3D, 2 = 2D). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ values, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/(m·K) throughout.
 
 ---
 
@@ -134,7 +148,7 @@ Usage: analyzePhono3py.py <kappa HDF5 file> <gruneisen HDF5 file (optional)>
 
 Output filenames follow the pattern `<tag>-mXXXXXX.dat`, where the mesh token is preserved from the input filename (e.g., `kappa-m111111.hdf5` → `KappaVsT-m111111.dat`). All κ tensor components are written in Voigt notation (xx, yy, zz, yz, xz, xy) in W/m-K.
 
-**2D renormalization:** After loading the HDF5 file, the script interactively prompts for dimensionality (1 = 3D, 2 = 2D). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ arrays before any output is written, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/m-K throughout. The renormalization applies to all output file groups below.
+**2D renormalization:** After loading the HDF5 file, the script interactively prompts for dimensionality (1 = 3D, 2 = 2D). For 2D materials, the vacuum direction is assumed to be c. A dimensionless renormalization factor derived from the c-axis length is applied to all κ arrays before any output is written, correcting Phono3py's bulk-convention κ to the 2D-referenced value. Units remain W/(m·K) throughout. The renormalization applies to all output file groups below.
 
 **Temperature-dependent files** (one value per temperature row, written to the working directory):
 - `KappaVsT.dat` / `Kappa_bandVsT.dat` — total κ tensor and band decomposition (3 acoustic + 1 summed optical) vs. temperature
@@ -183,12 +197,12 @@ Temperature subdirectories (`T<value>K/`) are detected automatically from the wo
 **Temperature-dependent files** (one value per temperature row, written to the working directory):
 - `Kappa_*VsT.dat` — total κ tensor vs. temperature, RTA and iterative (CONV) solutions
 - `Kappa_bandVsT.dat` — κ tensor decomposed into 3 acoustic branches + 1 summed optical branch vs. temperature
-- `HeatCapacityVsT.dat` — total heat capacity Cv (J/m^3-K) vs. temperature
+- `HeatCapacityVsT.dat` — total heat capacity Cv (J/(m<sup>3</sup>·K)) vs. temperature
 
 **Temperature-independent files** (written to the working directory):
 - `GroupVelocityVsFrequency.dat` / `GroupVelocityAmplitudeVsFrequency.dat` — group velocity vector (vx, vy, vz) and amplitude |v| in km/s vs. frequency (THz)
 - `GruneisenVsFrequency.dat` — Grüneisen parameter vs. frequency (THz)
-- `ScatteringRate_IsotopicVsFrequency.dat` / `Lifetime_IsotopicVsFrequency.dat` — isotope Γ (ps^-1) and τ (ps) vs. frequency
+- `ScatteringRate_IsotopicVsFrequency.dat` / `Lifetime_IsotopicVsFrequency.dat` — isotope Γ (ps<sup>-1</sup>) and τ (ps) vs. frequency
 - `P3*VsFrequency.dat` — total, absorption (+), and emission (−) 3-phonon phase space vs. frequency; each header records the corresponding scalar total
 - `P4*VsFrequency.dat` — same set for 4-phonon phase space (total, recombination ++, redistribution +-, splitting −−) *[FourPhonon only]*
 
@@ -206,6 +220,30 @@ Temperature subdirectories (`T<value>K/`) are detected automatically from the wo
 ### 2. Structural Analysis
 
 Scripts that read VASP POSCAR/CONTCAR structure files and compute structural properties.
+
+---
+
+#### `calDistance.py`
+**Inspired by:** [Jiraroj T-Thienprasert](https://scholar.google.com/citations?user=_U_cXy0AAAAJ&hl=en)
+
+Computes interatomic distances from a VASP POSCAR/CONTCAR file under periodic boundary conditions using the minimum-image convention. Four calculation modes are available interactively.
+
+```
+Usage: calDistance.py <POSCAR>
+```
+
+**Mode 1 — one atom to all:** Distances from a selected atom to every other atom in the cell, written in POSCAR order and sorted by ascending distance.
+- **Output:** `distance-unsorted.dat`, `distance-sorted.dat`
+
+**Mode 2 — atom pairs:** Distances between user-specified pairs of atoms.
+- **Output:** `distance-atom-atom.dat`
+
+**Mode 3 — atom to molecule:** Distance from a selected atom to the geometric centroid of a user-defined group of atoms.
+- **Output:** `distance-atom-molecule.dat`
+
+**Mode 4 — z-axis separation:** Separation along the z-axis between the highest atom in a substrate group and the lowest atom in an adsorbent group. Useful for measuring adsorption height or slab thickness. Output printed to stdout only.
+
+All modes support free-format atom selection by index, range (e.g., `1-4`), element symbol, or `all`.
 
 ---
 
@@ -248,7 +286,7 @@ Usage: vaspMechanics.py <POSCAR> <OUTCAR>
 - Computes Voigt, Reuss, and Hill (VRH) averages for bulk and shear moduli
 - Derives Young's modulus, Poisson's ratio, P-wave modulus, Lamé parameter, Pugh's ratio
 - Computes sound velocities (transverse, longitudinal, mean) and Debye temperature
-- Computes anisotropy indices: universal (A_U), bulk (A_B), shear (A_G), and planar (A_1, A_2, A_3)
+- Computes anisotropy indices: universal (A<sub>U</sub>), bulk (A<sub>B</sub>), shear (A<sub>G</sub>), and planar (A<sub>1</sub>, A<sub>2</sub>, A<sub>3</sub>)
 - **Output:** `Elastic.dat`, `Mechanics.dat`, `Anisotropy.dat`
 
 ---
@@ -302,15 +340,67 @@ Scripts for generating, transforming, and manipulating VASP POSCAR files for var
 
 ---
 
-#### `vaspSupercell.py`
+#### `vaspReformat.py`
 
-Generates a supercell POSCAR from a unit cell input using an expansion matrix. Accepts 3 values (diagonal expansion) or 9 values (full 3×3 matrix).
+Converts a VASP POSCAR/CONTCAR to a standardized VASP5 format with Direct coordinates. Handles VASP4 (no element line), VASP5, and VASP6 (with Hash code) input formats, PAW/GGA suffix stripping, duplicate element reordering, and all scaling factor conventions.
 
 ```
-Usage: vaspSupercell.py <POSCAR> <output POSCAR>
+Usage: vaspReformat.py <POSCAR> <output POSCAR>
 ```
 
-Uses an integer-exact (adjugate-matrix-based) grid point generation to avoid floating-point rounding errors. Supports anisotropic scale factors and Selective Dynamics.
+Supports optional Selective Dynamics and writes per-atom label comments (e.g., `Mo001`, `S002`) for identification in VESTA or XCrySDen.
+
+---
+
+#### `vaspShift.py`
+
+Shifts atomic positions in a VASP POSCAR to a standardized reference frame. The script interactively prompts for a shifting mode based on material dimensionality.
+
+```
+Usage: vaspShift.py <POSCAR> <output POSCAR>
+```
+
+All modes first unwrap atoms across periodic boundaries to compute a geometrically correct centroid before shifting.
+
+- **Mode 0 — 0D molecule:** centroid shifted to cell center (0.5, 0.5, 0.5)
+- **Mode 1 — 1D nanowire:** extend direction shifted to origin; transverse directions centered at 0.5. User selects the extend direction (x/y/z)
+- **Mode 2 — 2D sheet:** vacuum direction centered at 0.5; periodic directions shifted to origin. User selects the vacuum direction (x/y/z)
+- **Mode 3 — 3D bulk:** all atoms shifted so atom[0] lands at the cell origin
+- **Mode 4 — Adsorbate:** selected adsorbate group centered in XY at (0.5, 0.5); z-coordinates of all atoms left unchanged. Adsorbate selection supports free-format input (index, range, element symbol, `all`)
+
+---
+
+#### `vaspMirror.py`
+
+Reflects all atomic positions in a VASP POSCAR across a chosen Cartesian plane (XY, XZ, or YZ) by negating the perpendicular coordinate component. The lattice matrix is unchanged.
+
+```
+Usage: vaspMirror.py <POSCAR> <output POSCAR>
+```
+
+---
+
+#### `vaspRotate.py`
+
+Rotates atoms in a VASP POSCAR/CONTCAR file about a user-specified pivot point and axis using Rodrigues' rotation formula.
+
+```
+Usage: vaspRotate.py <POSCAR> <output POSCAR>
+```
+
+Supports rotation about arbitrary axes; pivot can be set to a specific atom, the center of mass, or a custom Cartesian point.
+
+---
+
+#### `vaspFix.py`
+
+Applies Selective Dynamics constraints to a VASP POSCAR, fixing atoms in specified Cartesian directions.
+
+```
+Usage: vaspFix.py <POSCAR> <output POSCAR>
+```
+
+Three atom-selection modes: by index/label, by cutoff radius (PBC-aware), or from an existing `SELECTED_FIX_ATOMS_LIST` file. Write a `SELECTED_FIX_ATOMS_LIST` log for reference and reuse.
 
 ---
 
@@ -326,15 +416,27 @@ Accepts 3 values (diagonal strain) or 9 values (full 3×3 tensor). Off-diagonal 
 
 ---
 
+#### `vaspSupercell.py`
+
+Generates a supercell POSCAR from a unit cell input using an expansion matrix. Accepts 3 values (diagonal expansion) or 9 values (full 3×3 matrix).
+
+```
+Usage: vaspSupercell.py <POSCAR> <output POSCAR>
+```
+
+Uses an integer-exact (adjugate-matrix-based) grid point generation to avoid floating-point rounding errors. Supports anisotropic scale factors and Selective Dynamics.
+
+---
+
 #### `vaspStack.py`
 
-Generates bilayer POSCAR files from an input POSCAR file by stacking along the c-axis.
+Generates a set of bilayer POSCAR files from a single input monolayer POSCAR by stacking two copies along the c-axis with systematically varied interlayer shifts and orientations.
 
 ```
 Usage: vaspStack.py <POSCAR>
 ```
 
-Features: lattice compatibility checking (`check_lattice`), 2D Bravais lattice type detection, high-symmetry stacking shift grids per lattice type, mirror-flip of the second layer, and a summary `STACK_LIST.txt` of all generated POSCARs.
+The script detects the 2D Bravais lattice type (hexagonal, square, rectangular, oblique) and generates a grid of high-symmetry stacking configurations appropriate for that lattice. Each configuration applies a fractional interlayer shift to the top layer, optionally with a mirror-flip. A summary `STACK_LIST.txt` is written listing all generated POSCAR filenames and their corresponding shift vectors.
 
 ---
 
@@ -356,50 +458,6 @@ Providing a single POSCAR uses it for both layers (homobilayer). Providing two d
 
 ---
 
-#### `vaspShift.py`
-
-Shifts atomic positions in a crystal structure to a desired reference frame, with modes for 0D molecules, 1D nanowires, 2D sheets, and 3D bulk materials.
-
-```
-Usage: vaspShift.py <POSCAR> <output POSCAR>
-```
-
----
-
-#### `vaspRotate.py`
-
-Rotates atoms in a VASP POSCAR/CONTCAR file about a user-specified pivot point and axis using Rodrigues' rotation formula.
-
-```
-Usage: vaspRotate.py <POSCAR> <output POSCAR>
-```
-
-Supports rotation about arbitrary axes; pivot can be set to a specific atom, the center of mass, or a custom Cartesian point.
-
----
-
-#### `vaspMirror.py`
-
-Reflects a VASP POSCAR structure across a chosen Cartesian plane (XY, XZ, or YZ).
-
-```
-Usage: vaspMirror.py <POSCAR> <output POSCAR>
-```
-
----
-
-#### `vaspFix.py`
-
-Applies Selective Dynamics constraints to a VASP POSCAR, fixing atoms in specified Cartesian directions.
-
-```
-Usage: vaspFix.py <POSCAR> <output POSCAR>
-```
-
-Three atom-selection modes: by index/label, by cutoff radius (PBC-aware), or from an existing `SELECTED_FIX_ATOMS_LIST` file. Writes a `SELECTED_FIX_ATOMS_LIST` log for reference and reuse.
-
----
-
 #### `vaspAdsorb.py`
 
 Combines a substrate and an adsorbent POSCAR file into a single POSCAR suitable for adsorption DFT calculations.
@@ -409,16 +467,6 @@ Usage: vaspAdsorb.py <substrate POSCAR> <adsorbent POSCAR> <output POSCAR>
 ```
 
 Two placement modes: on top of a specific substrate site (Mode 1) or arranged symmetrically around a target atom in a ring (Mode 2). Handles Selective Dynamics merging and element reordering for VASP compatibility.
-
----
-
-#### `vaspReformat.py`
-
-Converts a VASP POSCAR/CONTCAR to standardized VASP5 format, with optional Selective Dynamics support and per-atom label comments.
-
-```
-Usage: vaspReformat.py <POSCAR> <output POSCAR>
-```
 
 ---
 
@@ -461,7 +509,7 @@ Converts VASP's `ML_AB` binary training data file to extended XYZ (`.extxyz`) fo
 Usage: mlab2extxyz.py <ML_AB input> <output.extxyz>
 ```
 
-Each configuration block is mapped to one extxyz frame with lattice, positions, energy, forces, and stress. Stress is converted from kbar to eV/Å^3.
+Each configuration block is mapped to one extxyz frame with lattice, positions, energy, forces, and stress. Stress is converted from kbar to eV/Å<sup>3</sup>.
 
 ---
 
