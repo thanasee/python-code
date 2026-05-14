@@ -459,14 +459,19 @@ Providing a single POSCAR uses it for both layers (homobilayer). Providing two d
 ---
 
 #### `vaspAdsorb.py`
+**Inspired by:** [Aroon Ananchuensook](https://scholar.google.com/citations?user=6mmg4mUAAAAJ&hl=en)
 
-Combines a substrate and an adsorbent POSCAR file into a single POSCAR suitable for adsorption DFT calculations.
-
+Combines a substrate and an adsorbent POSCAR into a single POSCAR for adsorption DFT calculations. Supports placing multiple adsorbent copies simultaneously. The user specifies the number of copies and the vertical separation distance (Å) before selecting a placement mode.
+ 
 ```
 Usage: vaspAdsorb.py <substrate POSCAR> <adsorbent POSCAR> <output POSCAR>
 ```
-
-Two placement modes: on top of a specific substrate site (Mode 1) or arranged symmetrically around a target atom in a ring (Mode 2). Handles Selective Dynamics merging and element reordering for VASP compatibility.
+ 
+**Mode 1 — on top of a specific site:** Places each adsorbent copy above a user-defined target point on the substrate. For each copy, the user selects: (a) the substrate reference height (highest atom, a selected atom, or average height); (b) the adsorbent anchor point (centroid or a specific/lowest atom); (c) the target xy position (by atom selection with free-format input, or custom fractional coordinates). The adsorbent is translated so its anchor lands at the target at the specified vertical distance.
+ 
+**Mode 2 — ring around a target atom:** Places N copies evenly distributed at angular intervals of 2π/N around a chosen substrate atom using Rodrigues z-axis rotation. The user selects the target atom and the initial adsorption direction (by atom selection or custom fractional coordinates). The radial distance from the target atom is set by the distance input.
+ 
+If either POSCAR has Selective Dynamics, flags are merged, and the other structure defaults to all-T. If neither has Selective Dynamics, the user is prompted after placement to optionally add constraints, with free-format atom and direction selection. A summary table of atom counts per element (substrate/adsorbent/total) is printed at the end.
 
 ---
 
