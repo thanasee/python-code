@@ -576,7 +576,7 @@ Choices of positioning adsorbent for adsorbent {n+1:>2}
                 selected_positions_direct = cartesian_to_direct(lattice_matrix_substrate, positions_substrate[selected_atoms])
                 _, selected_positions_unwrapped = unwrap(selected_positions_direct)
                 centroid_direct = np.mean(selected_positions_unwrapped, axis=0)
-                target = centroid_direct @ lattice_matrix_substrate
+                target = direct_to_cartesian(lattice_matrix_substrate, centroid_direct)
                 break
             elif option_position == '2':
                 target = input_direct(lattice_matrix_substrate)
@@ -654,7 +654,7 @@ Choices of define initial adsorption site
             selected_positions_direct = cartesian_to_direct(lattice_matrix_substrate, positions_substrate[selected_atoms])
             _, selected_positions_unwrapped = unwrap(selected_positions_direct)
             centroid_direct = np.mean(selected_positions_unwrapped, axis=0)
-            target_initial = centroid_direct @ lattice_matrix_substrate
+            target_initial = direct_to_cartesian(lattice_matrix_substrate, centroid_direct)
             break
         elif option_site == '2':
             target_initial = input_direct(lattice_matrix_substrate)
