@@ -456,7 +456,7 @@ def input_direct(lattice_matrix):
             print("Wrong input! Try again")
     coords.append(0.0)
 
-    return coords @ lattice_matrix
+    return direct_to_cartesian(lattice_matrix, np.array(coords))
 
 
 def place_ontop(lattice_matrix_substrate, total_atoms_substrate, total_atoms_adsorbent, positions_substrate,
