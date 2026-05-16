@@ -54,7 +54,7 @@ def read_band_dat(filepath):
     if not freqs:
         raise ValueError("No frequency data found in input file (2nd column).")
  
-    fmin = np.floor((min(freqs) - 1.0) * 1.10)
+    fmin = np.floor((min(freqs) - 0.50) * 1.10)
     fmax = np.ceil(max(freqs) * 1.25)
  
     return q_points, fmin, fmax
